@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -33,11 +34,10 @@ public class SerialServiceImpl implements SerialService {
 
             serialPort = SerialPort.getCommPort(config.getPort());
             serialPort.setBaudRate(config.getBaudrate());
-            // 1. Usamos el Timeout de tu config (que es 30000ms)
-            //    Si no, usa el de 10s que tenías (10000). 30s es más seguro.
+            
             serialPort.setComPortTimeouts(
                     SerialPort.TIMEOUT_READ_BLOCKING,
-                    1000, // 30000 ms
+                    1000,
                     0
             );
 
@@ -45,77 +45,36 @@ public class SerialServiceImpl implements SerialService {
                 throw new SerialCommunicationException("No se pudo abrir el puerto serial");
             }
 
-            log.info("Puerto serial abierto. Esperando el saludo 'READY:' del ESP32...");
+            // Dar un pequeño delay después de abrir el puerto
+            Thread.sleep(100);
 
-            // Prepara el reader y writer
+            // Prepara el reader y writer con encoding correcto
             reader = new BufferedReader(
-                    new InputStreamReader(serialPort.getInputStream())
+                    new InputStreamReader(serialPort.getInputStream(), "US-ASCII")
             );
             writer = new PrintWriter(
                     serialPort.getOutputStream(),
-                    true
+                    true // auto-flush
             );
 
-            // --- Lógica robusta para el Handshake ---
-
-            long startTime = System.currentTimeMillis();
-            long timeoutMillis = config.getTimeout(); // 30000 ms
-            boolean isReady = false;
-
-            log.info("Puerto serial abierto. Esperando 'READY:' del ESP32 (max {}s)...", timeoutMillis / 1000);
-
-            // Bucle para esperar el "READY:"
-            while (!isReady && (System.currentTimeMillis() - startTime) < timeoutMillis) {
-                try {
-                    // readLine() esperará MÁXIMO 1 segundo (por el timeout que pusimos)
-                    String response = reader.readLine();
-
-                    if (response != null) {
-                        log.debug("Datos recibidos del ESP32: {}", response); // Loguea todo
-
-                        if (response.startsWith("READY:")) {
-                            log.info("¡Arduino está LISTO! Conexión establecida. ({})", response);
-                            isReady = true; // ¡Éxito! Salimos del bucle
-                        } else {
-                            // Es basura de bootloader u otro mensaje (SENSOR_OK, etc.)
-                            log.warn("Ignorando línea (no es READY): {}", response);
-                            // El bucle continuará y leerá la siguiente línea
-                        }
-                    }
-                } catch (Exception e) {
-                    // Esto puede pasar si el timeout de 1s se cumple y no hay nada
-                    // No es un error, solo significa "nada que leer, sigue intentando"
-                    log.trace("Timeout de lectura, reintentando...");
-                }
+            log.info("✓ Puerto serial abierto correctamente en {}", config.getPort());
+            
+            // Limpiar mensajes de inicio del ESP32 inmediatamente
+            log.info("Limpiando buffer inicial...");
+            Thread.sleep(20); // Solo para que lleguen los mensajes del bootloader
+            int bytesDiscarded = 0;
+            while (serialPort.getInputStream().available() > 0) {
+                serialPort.getInputStream().read();
+                bytesDiscarded++;
             }
-
-            // Si salimos del bucle sin éxito, es un error de timeout.
-            if (!isReady) {
-                log.error("Timeout: Arduino no envió 'READY:' en {} segundos.", timeoutMillis / 1000);
-                throw new SerialCommunicationException("No se recibió 'READY:' del Arduino (timeout).");
-            }
+            log.info("Buffer limpiado: {} bytes", bytesDiscarded);
+            
+            log.info("✓ Listo - sensor responde en 50ms");
 
         } catch (Exception e) {
             log.error("Error fatal inicializando puerto serial: {}", e.getMessage());
-            cleanup(); // Cierra el puerto si algo falla
+            cleanup();
             throw new SerialCommunicationException("Error al conectar: " + e.getMessage());
-        }
-    }
-
-    private void waitForReady() throws Exception {
-        String response;
-        long startTime = System.currentTimeMillis();
-
-        while ((System.currentTimeMillis() - startTime) < 5000) {
-            if (reader.ready()) {
-                response = reader.readLine();
-                log.info("Arduino: {}", response);
-                if (response != null && response.startsWith("READY:")) {
-                    log.info("Arduino listo");
-                    return;
-                }
-            }
-            Thread.sleep(100);
         }
     }
 
@@ -123,6 +82,11 @@ public class SerialServiceImpl implements SerialService {
     public String sendCommand(String command) throws Exception {
         if (!isConnected()) {
             throw new SerialCommunicationException("Puerto serial no conectado");
+        }
+
+        // Limpiar buffer antes de enviar comando
+        while (serialPort.getInputStream().available() > 0) {
+            serialPort.getInputStream().read();
         }
 
         log.debug("Enviando comando: {}", command);
@@ -163,30 +127,66 @@ public class SerialServiceImpl implements SerialService {
             throw new SerialCommunicationException("Puerto serial no conectado");
         }
 
-        log.debug("Enviando comando con progreso: {}", command);
-        writer.println(command);
+        // Limpiar buffer antes de enviar comando
+        log.debug("Limpiando buffer...");
+        int bytesCleared = 0;
+        while (serialPort.getInputStream().available() > 0) {
+            serialPort.getInputStream().read();
+            bytesCleared++;
+        }
+        if (bytesCleared > 0) {
+            log.debug("Buffer limpiado: {} bytes descartados", bytesCleared);
+        }
+
+        log.info(">>> Enviando comando: [{}]", command);
+        
+        // Enviar con más detalle de debug
+        String fullCommand = command + "\n";
+        byte[] commandBytes = fullCommand.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        log.info("Bytes a enviar: {} bytes = {}", commandBytes.length, java.util.Arrays.toString(commandBytes));
+        
+        writer.print(fullCommand);
         writer.flush();
+        
+        log.info("✓ Comando enviado, esperando respuesta...");
 
         List<String> messages = new ArrayList<>();
-        String line;
-
         long startTime = System.currentTimeMillis();
+        int checksWithoutData = 0;
+        
         while ((System.currentTimeMillis() - startTime) < config.getTimeout()) {
-            if (reader.ready()) {
-                line = reader.readLine();
-                if (line != null) {
-                    log.debug("Arduino: {}", line);
-                    messages.add(line);
+            try {
+                int available = serialPort.getInputStream().available();
+                if (available > 0) {
+                    log.info("Datos detectados: {} bytes disponibles", available);
+                    String line = reader.readLine();
+                    if (line != null && !line.trim().isEmpty()) {
+                        String cleanLine = line.replaceAll("[^\\x20-\\x7E:]", "").trim();
+                        if (!cleanLine.isEmpty()) {
+                            log.info("<<< ESP32: {}", cleanLine);
+                            messages.add(cleanLine);
 
-                    if (line.startsWith("SUCCESS:") || line.startsWith("ERROR:")) {
-                        break;
+                            if (cleanLine.startsWith("SUCCESS:") || cleanLine.startsWith("ERROR:")) {
+                                log.info("✓ Comando finalizado: {}", cleanLine);
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    checksWithoutData++;
+                    if (checksWithoutData % 100 == 0) {
+                        log.debug("Esperando datos... ({} checks sin respuesta)", checksWithoutData);
                     }
                 }
+                Thread.sleep(10);
+            } catch (IOException e) {
+                log.error("Error leyendo respuesta: {}", e.getMessage());
+                break;
             }
-            Thread.sleep(100);
         }
 
         if (messages.isEmpty()) {
+            log.error("TIMEOUT: No se recibió respuesta del ESP32 en {} ms", config.getTimeout());
             throw new SerialCommunicationException("Timeout esperando respuesta del sensor");
         }
 
