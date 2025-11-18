@@ -66,14 +66,13 @@ public class SerialServiceImpl implements SerialService {
                 log.warn("Arduino no envió 'READY:'. Recibido: {}", response);
             }
             
-            // Evita que los enrollments sean lentos
             serialPort.setComPortTimeouts(
-                    SerialPort.TIMEOUT_READ_BLOCKING,
-                    1000, // 1 segundo para operación normal
+                    SerialPort.TIMEOUT_READ_SEMI_BLOCKING,
+                    10,
                     0
             );
             
-            log.info("Timeout ajustado a 1s para operación normal");
+            log.info("Timeout ajustado a 10ms para operacion normal");
 
         } catch (Exception e) {
             log.error("Error fatal inicializando puerto serial: {}", e.getMessage());
@@ -131,43 +130,20 @@ public class SerialServiceImpl implements SerialService {
             throw new SerialCommunicationException("Puerto serial no conectado");
         }
 
-        // Limpiar buffer antes de enviar comando
-        log.info("Limpiando buffer antes de comando...");
-        int bytesCleared = 0;
-        
-        // Leer todo lo que haya en el buffer hasta 3 veces
-        for (int i = 0; i < 3; i++) {
-            while (serialPort.getInputStream().available() > 0) {
-                serialPort.getInputStream().read();
-                bytesCleared++;
-            }
-            try { 
-                Thread.sleep(50); 
-            } catch (InterruptedException e) {}
-        }
-        
-        if (bytesCleared > 0) {
-            log.warn("Buffer tenía {} bytes antiguos - descartados", bytesCleared);
+        while (serialPort.getInputStream().available() > 0) {
+            serialPort.getInputStream().read();
         }
 
         log.info(">>> Enviando comando: [{}]", command);
-        
-        // Enviar con más detalle de debug
-        String fullCommand = command + "\n";
-        byte[] commandBytes = fullCommand.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
-        log.info("Bytes a enviar: {} bytes = {}", commandBytes.length, java.util.Arrays.toString(commandBytes));
-        
-        writer.print(fullCommand);
+        writer.println(command);
         writer.flush();
-        
         log.info("Comando enviado, esperando respuesta...");
 
         List<String> messages = new ArrayList<>();
         long startTime = System.currentTimeMillis();
         long lastDataTime = System.currentTimeMillis();
         
-        // Permitir hasta 40s de silencio entre mensajes (el ESP32 tarda en extraer y enviar template)
-        final long MAX_IDLE_TIME = 40000;
+        final long MAX_IDLE_TIME = 30000;
         
         while ((System.currentTimeMillis() - startTime) < config.getTimeout()) {
             try {
@@ -175,35 +151,32 @@ public class SerialServiceImpl implements SerialService {
                 if (available > 0) {
                     lastDataTime = System.currentTimeMillis();
                     
-                    String line = reader.readLine();
-                    if (line != null && !line.trim().isEmpty()) {
-                        String cleanLine = line.replaceAll("[^\\x20-\\x7E:]", "").trim();
-                        if (!cleanLine.isEmpty()) {
-                            // Log diferente para TEMPLATE (es muy largo)
-                            if (cleanLine.startsWith("TEMPLATE:")) {
-                                int templateLength = cleanLine.length() - 9;
-                                log.info("<<< ESP32: TEMPLATE: {} caracteres hex", templateLength);
-                            } else {
-                                log.info("<<< ESP32: {}", cleanLine);
+                    if (reader.ready()) {
+                        String line = reader.readLine();
+                        if (line != null && !line.trim().isEmpty()) {
+                            String cleanLine = line.trim();
+                            
+                            if (cleanLine.startsWith("READY:") || cleanLine.equals("SENSOR_OK") || cleanLine.equals("SENSOR_NOT_FOUND")) {
+                                continue;
                             }
                             
+                            log.info("<<< ESP32: {}", cleanLine);
                             messages.add(cleanLine);
 
-                            if (cleanLine.startsWith("SUCCESS:") || cleanLine.startsWith("ERROR:")) {
+                            if (isEndOfResponse(cleanLine)) {
                                 log.info("Comando finalizado: {}", cleanLine);
                                 break;
                             }
                         }
                     }
                 } else {
-                    // Sin datos - verificar timeout de inactividad
                     long idleTime = System.currentTimeMillis() - lastDataTime;
                     if (idleTime > MAX_IDLE_TIME) {
-                        log.warn("Timeout de inactividad: {} ms sin datos desde último mensaje", idleTime);
+                        log.warn("Timeout de inactividad: {} ms", idleTime);
                         break;
                     }
+                    Thread.sleep(10);
                 }
-                Thread.sleep(50); // Aumentado a 50ms para reducir CPU
             } catch (IOException e) {
                 log.error("Error leyendo respuesta: {}", e.getMessage());
                 break;
@@ -211,7 +184,7 @@ public class SerialServiceImpl implements SerialService {
         }
 
         if (messages.isEmpty()) {
-            log.error("TIMEOUT: No se recibió respuesta del ESP32 en {} ms", config.getTimeout());
+            log.error("TIMEOUT: No se recibio respuesta");
             throw new SerialCommunicationException("Timeout esperando respuesta del sensor");
         }
 
@@ -219,13 +192,28 @@ public class SerialServiceImpl implements SerialService {
     }
 
     private boolean isEndOfResponse(String line) {
-        return line.startsWith("SUCCESS:") ||
-                line.startsWith("ERROR:") ||
-                line.startsWith("VERIFIED:") ||
-                line.equals("NOT_FOUND") ||
-                line.startsWith("COUNT:") ||
-                line.equals("PONG") ||
-                line.startsWith("TEMPLATE:");
+        if (line.startsWith("READY:") || line.equals("SENSOR_OK") || line.equals("SENSOR_NOT_FOUND") || line.equals("Waiting for finger")) {
+            return false;
+        }
+        
+        return line.equals("PONG") ||
+                line.contains(" templates") ||
+                line.equals("Database emptied!") ||
+                line.equals("Could not clear database") ||
+                line.equals("Deleted!") ||
+                line.equals("Could not delete in that location") ||
+                line.equals("Did not find a match") ||
+                line.startsWith("Found ID #") ||
+                line.equals("No finger detected") ||
+                line.equals("Image too messy") ||
+                line.equals("Unknown error") ||
+                line.equals("Communication error") ||
+                line.equals("Error writing to flash") ||
+                line.equals("Could not store in that location") ||
+                line.equals("Fingerprints did not match") ||
+                line.equals("Could not find fingerprint features") ||
+                line.equals("Imaging error") ||
+                line.matches("\\d+");
     }
 
     @Override

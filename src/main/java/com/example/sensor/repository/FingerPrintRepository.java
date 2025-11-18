@@ -9,6 +9,7 @@ import java.util.Optional;
 
 public interface FingerPrintRepository extends JpaRepository<FingerPrint,Integer> {
     Optional<FingerPrint> findByFingerprintId(Integer fingerprintId);
+    Optional<FingerPrint> findByFingerprintIdAndActiveTrue(Integer fingerprintId);
     boolean existsByFingerprintId(Integer fingerprintId);
     List<FingerPrint> findAllByActiveTrue();
 
