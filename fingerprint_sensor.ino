@@ -145,7 +145,6 @@ void enrollFingerprint() {
         Serial.println("Image taken");
         break;
       case FINGERPRINT_NOFINGER:
-        Serial.println("Waiting for finger");
         break;
       case FINGERPRINT_PACKETRECIEVEERR:
         Serial.println("Communication error");
