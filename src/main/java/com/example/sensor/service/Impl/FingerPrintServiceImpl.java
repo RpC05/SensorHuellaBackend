@@ -189,17 +189,16 @@ public class FingerPrintServiceImpl implements FingerPrintService {
         try {
             log.info("Vaciando base de datos del sensor...");
             
-            List<String> messages = serialService.sendCommandWithProgress("EMPTY");
-            String lastMessage = messages.get(messages.size() - 1);
+            String messages = serialService.sendCommand("EMPTY");
             
-            if (lastMessage.equals("Database emptied!")) {
+            if (messages.equals("Database emptied!")) {
                 log.info("Base de datos del sensor vaciada");
                 
                 repository.deleteAll();
                 log.info("Base de datos PostgreSQL vaciada");
             } else {
-                log.error("Error vaciando sensor: {}", lastMessage);
-                throw new FingerPrintException("Error vaciando sensor: " + lastMessage);
+                log.error("Error vaciando sensor: {}", messages);
+                throw new FingerPrintException("Error vaciando sensor: " + messages);
             }
         } catch (Exception e) {
             log.error("Error vaciando base de datos", e);
