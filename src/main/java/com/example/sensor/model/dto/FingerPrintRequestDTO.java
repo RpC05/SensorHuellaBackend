@@ -11,6 +11,5 @@ import lombok.NoArgsConstructor;
 public class FingerPrintRequestDTO {
     @NotBlank(message = "El nombre de usuario es requerido")
     private String name;
-
     private String description;
 }
