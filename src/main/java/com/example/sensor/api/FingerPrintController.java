@@ -21,6 +21,11 @@ import java.util.List;
 public class FingerPrintController {
     private final FingerPrintService fingerprintService;
 
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("OK");
+    }
+
     @GetMapping
     public ResponseEntity<List<FingerPrintResponseDTO>> getAllFingerprints() {
         List<FingerPrintResponseDTO> fingerprints = fingerprintService.findAll();
