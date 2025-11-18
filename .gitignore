@@ -36,6 +36,7 @@ build/
 .env
 .env.local
 .env.*.local
+src/.env
 
 ### Cloudflare Tunnel ###
 .cloudflared/
