@@ -17,6 +17,14 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * @deprecated Esta implementación usa puerto serial COM y solo funciona en desarrollo local.
+ * Para despliegue en la nube, usa {@link Esp32HttpServiceImpl} en su lugar.
+ * 
+ * Esta clase se mantiene para compatibilidad con desarrollo local cuando el ESP32
+ * está conectado directamente por USB.
+ */
+@Deprecated(since = "1.0", forRemoval = false)
 @Service
 @Slf4j
 @RequiredArgsConstructor
