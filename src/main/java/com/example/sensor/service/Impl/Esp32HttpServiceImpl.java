@@ -8,7 +8,6 @@ import com.example.sensor.model.dto.Esp32VerifyResponseDTO;
 import com.example.sensor.service.SerialService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -21,13 +20,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Implementación de SerialService que se comunica con el ESP32 vía HTTP
- * en lugar de puerto serial COM.
- * 
- * Reemplaza a SerialServiceImpl para permitir despliegue en la nube.
+ * Implementación de SerialService que se comunica con el ESP32 vía HTTP.
+ * Permite despliegue en la nube usando Cloudflare Tunnel o ngrok.
  */
 @Service
-@Primary  // Esta implementación tiene prioridad sobre SerialServiceImpl
 @Slf4j
 @RequiredArgsConstructor
 public class Esp32HttpServiceImpl implements SerialService {
