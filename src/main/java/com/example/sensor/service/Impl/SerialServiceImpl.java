@@ -35,18 +35,16 @@ public class SerialServiceImpl implements SerialService {
             serialPort = SerialPort.getCommPort(config.getPort());
             serialPort.setBaudRate(config.getBaudrate());
             
+            // TIMEOUT LARGO SOLO PARA ESPERAR "READY:" (el ESP32 tarda hasta 3s en reiniciar)
             serialPort.setComPortTimeouts(
                     SerialPort.TIMEOUT_READ_BLOCKING,
-                    1000,
+                    5000, // 5 segundos para esperar READY: del ESP32
                     0
             );
 
             if (!serialPort.openPort()) {
                 throw new SerialCommunicationException("No se pudo abrir el puerto serial");
             }
-
-            // Dar un pequeño delay después de abrir el puerto
-            Thread.sleep(100);
 
             // Prepara el reader y writer con encoding correcto
             reader = new BufferedReader(
@@ -57,19 +55,25 @@ public class SerialServiceImpl implements SerialService {
                     true // auto-flush
             );
 
-            log.info("✓ Puerto serial abierto correctamente en {}", config.getPort());
+            log.info("Puerto serial abierto en {}. Esperando 'READY:' del ESP32...", config.getPort());
+        
+            // Esperar el mensaje READY
+            String response = reader.readLine();
             
-            // Limpiar mensajes de inicio del ESP32 inmediatamente
-            log.info("Limpiando buffer inicial...");
-            Thread.sleep(20); // Solo para que lleguen los mensajes del bootloader
-            int bytesDiscarded = 0;
-            while (serialPort.getInputStream().available() > 0) {
-                serialPort.getInputStream().read();
-                bytesDiscarded++;
+            if (response != null && response.startsWith("READY:")) {
+                log.info("Arduino LISTO - Conexión establecida ({})", response.trim());
+            } else {
+                log.warn("Arduino no envió 'READY:'. Recibido: {}", response);
             }
-            log.info("Buffer limpiado: {} bytes", bytesDiscarded);
             
-            log.info("✓ Listo - sensor responde en 50ms");
+            // Evita que los enrollments sean lentos
+            serialPort.setComPortTimeouts(
+                    SerialPort.TIMEOUT_READ_BLOCKING,
+                    1000, // 1 segundo para operación normal
+                    0
+            );
+            
+            log.info("Timeout ajustado a 1s para operación normal");
 
         } catch (Exception e) {
             log.error("Error fatal inicializando puerto serial: {}", e.getMessage());
@@ -128,14 +132,22 @@ public class SerialServiceImpl implements SerialService {
         }
 
         // Limpiar buffer antes de enviar comando
-        log.debug("Limpiando buffer...");
+        log.info("Limpiando buffer antes de comando...");
         int bytesCleared = 0;
-        while (serialPort.getInputStream().available() > 0) {
-            serialPort.getInputStream().read();
-            bytesCleared++;
+        
+        // Leer todo lo que haya en el buffer hasta 3 veces
+        for (int i = 0; i < 3; i++) {
+            while (serialPort.getInputStream().available() > 0) {
+                serialPort.getInputStream().read();
+                bytesCleared++;
+            }
+            try { 
+                Thread.sleep(50); 
+            } catch (InterruptedException e) {}
         }
+        
         if (bytesCleared > 0) {
-            log.debug("Buffer limpiado: {} bytes descartados", bytesCleared);
+            log.warn("Buffer tenía {} bytes antiguos - descartados", bytesCleared);
         }
 
         log.info(">>> Enviando comando: [{}]", command);
@@ -148,37 +160,50 @@ public class SerialServiceImpl implements SerialService {
         writer.print(fullCommand);
         writer.flush();
         
-        log.info("✓ Comando enviado, esperando respuesta...");
+        log.info("Comando enviado, esperando respuesta...");
 
         List<String> messages = new ArrayList<>();
         long startTime = System.currentTimeMillis();
-        int checksWithoutData = 0;
+        long lastDataTime = System.currentTimeMillis();
+        
+        // Permitir hasta 40s de silencio entre mensajes (el ESP32 tarda en extraer y enviar template)
+        final long MAX_IDLE_TIME = 40000;
         
         while ((System.currentTimeMillis() - startTime) < config.getTimeout()) {
             try {
                 int available = serialPort.getInputStream().available();
                 if (available > 0) {
-                    log.info("Datos detectados: {} bytes disponibles", available);
+                    lastDataTime = System.currentTimeMillis();
+                    
                     String line = reader.readLine();
                     if (line != null && !line.trim().isEmpty()) {
                         String cleanLine = line.replaceAll("[^\\x20-\\x7E:]", "").trim();
                         if (!cleanLine.isEmpty()) {
-                            log.info("<<< ESP32: {}", cleanLine);
+                            // Log diferente para TEMPLATE (es muy largo)
+                            if (cleanLine.startsWith("TEMPLATE:")) {
+                                int templateLength = cleanLine.length() - 9;
+                                log.info("<<< ESP32: TEMPLATE: {} caracteres hex", templateLength);
+                            } else {
+                                log.info("<<< ESP32: {}", cleanLine);
+                            }
+                            
                             messages.add(cleanLine);
 
                             if (cleanLine.startsWith("SUCCESS:") || cleanLine.startsWith("ERROR:")) {
-                                log.info("✓ Comando finalizado: {}", cleanLine);
+                                log.info("Comando finalizado: {}", cleanLine);
                                 break;
                             }
                         }
                     }
                 } else {
-                    checksWithoutData++;
-                    if (checksWithoutData % 100 == 0) {
-                        log.debug("Esperando datos... ({} checks sin respuesta)", checksWithoutData);
+                    // Sin datos - verificar timeout de inactividad
+                    long idleTime = System.currentTimeMillis() - lastDataTime;
+                    if (idleTime > MAX_IDLE_TIME) {
+                        log.warn("Timeout de inactividad: {} ms sin datos desde último mensaje", idleTime);
+                        break;
                     }
                 }
-                Thread.sleep(10);
+                Thread.sleep(50); // Aumentado a 50ms para reducir CPU
             } catch (IOException e) {
                 log.error("Error leyendo respuesta: {}", e.getMessage());
                 break;

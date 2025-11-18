@@ -21,30 +21,18 @@ import java.util.List;
 public class FingerPrintController {
     private final FingerPrintService fingerprintService;
 
-    /**
-     * GET /api/fingerprints
-     * Obtener todas las huellas activas
-     */
     @GetMapping
     public ResponseEntity<List<FingerPrintResponseDTO>> getAllFingerprints() {
         List<FingerPrintResponseDTO> fingerprints = fingerprintService.findAll();
         return ResponseEntity.ok(fingerprints);
     }
 
-    /**
-     * GET /api/fingerprints/{id}
-     * Obtener una huella por ID
-     */
     @GetMapping("/{id}")
     public ResponseEntity<FingerPrintResponseDTO> getFingerprintById(@PathVariable Integer id) {
         FingerPrintResponseDTO fingerprint = fingerprintService.findById(id);
         return ResponseEntity.ok(fingerprint);
     }
 
-    /**
-     * POST /api/fingerprints
-     * Enrollar nueva huella
-     */
     @PostMapping
     public ResponseEntity<EnrollProgressDTO> enrollFingerprint(
             @Valid @RequestBody FingerPrintRequestDTO requestDto) {
@@ -58,10 +46,6 @@ public class FingerPrintController {
         }
     }
 
-    /**
-     * DELETE /api/fingerprints/{id}
-     * Eliminar huella
-     */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteFingerprint(@PathVariable Integer id) {
         log.info("DELETE /api/fingerprints/{} - Eliminando huella", id);
@@ -69,21 +53,13 @@ public class FingerPrintController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * POST /api/fingerprints/verify
-     * Verificar huella
-     */
     @PostMapping("/verify")
     public ResponseEntity<FingerPrintVerifyResponseDTO> verifyFingerprint() {
-        log.info("POST /api/fingerprints/verify - Verificando huella");
+        log.info("POST /api/fingerprints/verify - Verificando huella contra BD");
         FingerPrintVerifyResponseDTO result = fingerprintService.verifyFingerprint();
         return ResponseEntity.ok(result);
     }
 
-    /**
-     * GET /api/fingerprints/count
-     * Contar huellas activas
-     */
     @GetMapping("/count")
     public ResponseEntity<Integer> getCount() {
         log.info("GET /api/fingerprints/count - Contando huellas");

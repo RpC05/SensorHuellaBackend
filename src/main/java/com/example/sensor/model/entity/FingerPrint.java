@@ -46,5 +46,6 @@ public class FingerPrint {
     private LocalDateTime updatedAt;
 
     @Column(name="fprint_estado_bol", nullable = false)
+    @Builder.Default
     private Boolean active = true;
 }
