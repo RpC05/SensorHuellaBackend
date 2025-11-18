@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -12,7 +13,12 @@ import java.time.LocalDateTime;
 public class FingerPrintResponseDTO {
     private Integer id;
     private Integer fingerprintId;
-    private String name;
+    private String nombres;
+    private String apellidoPaterno;
+    private String apellidoMaterno;
+    private LocalDate fechaNacimiento;
+    private String tipoDocumento;
+    private String numeroDocumento;
     private String description;
     private LocalDateTime enrolledAt;
     private LocalDateTime updatedAt;

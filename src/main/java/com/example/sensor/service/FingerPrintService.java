@@ -14,4 +14,5 @@ public interface FingerPrintService {
     void deleteFingerprint(Integer id);
     FingerPrintVerifyResponseDTO verifyFingerprint();
     Integer getCount();
+    void emptyDatabase();
 }
