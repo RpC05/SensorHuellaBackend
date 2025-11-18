@@ -108,9 +108,8 @@ public class FingerPrintServiceImpl implements FingerPrintService {
                 log.warn("Error eliminando del sensor: {}", e.getMessage());
             }
 
-            fingerprint.setActive(false);
-            repository.save(fingerprint);
-            log.info("Huella eliminada");
+            repository.delete(fingerprint);
+            log.info("Huella eliminada de la BD");
 
         } catch (FingerPrintNotFoundException e) {
             throw e;
@@ -195,6 +194,9 @@ public class FingerPrintServiceImpl implements FingerPrintService {
             
             if (lastMessage.equals("Database emptied!")) {
                 log.info("Base de datos del sensor vaciada");
+                
+                repository.deleteAll();
+                log.info("Base de datos PostgreSQL vaciada");
             } else {
                 log.error("Error vaciando sensor: {}", lastMessage);
                 throw new FingerPrintException("Error vaciando sensor: " + lastMessage);
