@@ -36,7 +36,7 @@ public class FingerPrintController {
     @PostMapping
     public ResponseEntity<EnrollProgressDTO> enrollFingerprint(
             @Valid @RequestBody FingerPrintRequestDTO requestDto) {
-        log.info("POST /api/fingerprints - Enrollando nueva huella para: {}", requestDto.getName());
+        log.info("POST /api/fingerprints - Enrollando nueva huella para: {}", requestDto.getNombres());
         EnrollProgressDTO result = fingerprintService.enrollFingerprint(requestDto);
 
         if ("SUCCESS".equals(result.getStatus())) {
@@ -55,15 +55,22 @@ public class FingerPrintController {
 
     @PostMapping("/verify")
     public ResponseEntity<FingerPrintVerifyResponseDTO> verifyFingerprint() {
-        log.info("POST /api/fingerprints/verify - Verificando huella contra BD");
+        log.info("POST /fingerprints/verify - Verificando huella");
         FingerPrintVerifyResponseDTO result = fingerprintService.verifyFingerprint();
         return ResponseEntity.ok(result);
     }
 
     @GetMapping("/count")
     public ResponseEntity<Integer> getCount() {
-        log.info("GET /api/fingerprints/count - Contando huellas");
+        log.info("GET /fingerprints/count - Contando huellas");
         Integer count = fingerprintService.getCount();
         return ResponseEntity.ok(count);
+    }
+
+    @DeleteMapping("/empty")
+    public ResponseEntity<Void> emptyDatabase() {
+        log.info("DELETE /fingerprints/empty - Vaciando base de datos del sensor");
+        fingerprintService.emptyDatabase();
+        return ResponseEntity.noContent().build();
     }
 }

@@ -13,6 +13,8 @@ public class FingerPrintVerifyResponseDTO {
     private Boolean found;
     private Integer fingerprintId;
     private Integer confidence;
-    private String userName;
+    private String nombres;
+    private String apellidoPaterno;
+    private String apellidoMaterno;
     private String message;
 }
