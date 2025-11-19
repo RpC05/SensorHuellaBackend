@@ -3,6 +3,7 @@ package com.example.sensor.api;
 import com.example.sensor.model.dto.EnrollProgressDTO;
 import com.example.sensor.model.dto.FingerPrintRequestDTO;
 import com.example.sensor.model.dto.FingerPrintResponseDTO;
+import com.example.sensor.model.dto.FingerPrintUpdateDTO;
 import com.example.sensor.model.dto.FingerPrintVerifyResponseDTO;
 import com.example.sensor.service.FingerPrintService;
 import jakarta.validation.Valid;
@@ -49,6 +50,15 @@ public class FingerPrintController {
         } else {
             return ResponseEntity.badRequest().body(result);
         }
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<FingerPrintResponseDTO> updateFingerprint(
+            @PathVariable Integer id,
+            @RequestBody FingerPrintUpdateDTO updateDto) {
+        log.info("PATCH /api/fingerprints/{} - Actualizando datos", id);
+        FingerPrintResponseDTO updated = fingerprintService.updateFingerprint(id, updateDto);
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
