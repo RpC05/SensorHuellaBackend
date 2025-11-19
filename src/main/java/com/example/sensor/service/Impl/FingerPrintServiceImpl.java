@@ -87,6 +87,23 @@ public class FingerPrintServiceImpl implements FingerPrintService {
     }
 
     @Override
+<<<<<<< Updated upstream
+=======
+    public FingerPrintResponseDTO updateFingerprint(Integer id, FingerPrintUpdateDTO updateDto) {
+        if (id == null) {
+            throw new IllegalArgumentException("El ID no puede ser null");
+        }
+        
+        FingerPrint fingerprint = repository.findById(id)
+                .orElseThrow(() -> new FingerPrintNotFoundException(id));
+        FingerPrint updated = repository.save(fingerprint);
+        log.info("Huella ID:{} actualizada", id);
+        
+        return mapper.toResponseDto(updated);
+    }
+
+    @Override
+>>>>>>> Stashed changes
     public void deleteFingerprint(Integer id) {
         try {
             if (id == null) {
@@ -141,9 +158,6 @@ public class FingerPrintServiceImpl implements FingerPrintService {
                                 .found(true)
                                 .fingerprintId(fingerprintId)
                                 .confidence(confidence)
-                                .nombres(fingerprint.getNombres())
-                                .apellidoPaterno(fingerprint.getApellidoPaterno())
-                                .apellidoMaterno(fingerprint.getApellidoMaterno())
                                 .message("Huella verificada")
                                 .build();
                     } else {

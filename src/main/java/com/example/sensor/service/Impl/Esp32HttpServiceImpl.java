@@ -96,7 +96,7 @@ public class Esp32HttpServiceImpl implements SerialService {
         log.debug("Haciendo ping al ESP32...");
         
         String response = esp32WebClient.get()
-                .uri("/api/ping")
+                .uri("/api/fingerprint/ping")
                 .retrieve()
                 .bodyToMono(String.class)
                 .timeout(Duration.ofMillis(config.getQuickTimeout()))
@@ -114,7 +114,7 @@ public class Esp32HttpServiceImpl implements SerialService {
         log.info("Consultando conteo de huellas al ESP32...");
         
         Esp32CountResponseDTO response = esp32WebClient.get()
-                .uri("/api/count")
+                .uri("/api/fingerprint/count")
                 .retrieve()
                 .bodyToMono(Esp32CountResponseDTO.class)
                 .timeout(Duration.ofMillis(config.getQuickTimeout()))
@@ -155,7 +155,7 @@ public class Esp32HttpServiceImpl implements SerialService {
         log.info("Vaciando base de datos del sensor...");
         
         String response = esp32WebClient.delete()
-                .uri("/api/empty")
+                .uri("/api/fingerprint/empty")
                 .retrieve()
                 .bodyToMono(String.class)
                 .timeout(Duration.ofMillis(config.getQuickTimeout()))
@@ -173,7 +173,7 @@ public class Esp32HttpServiceImpl implements SerialService {
         log.info("Iniciando proceso de enroll en ESP32...");
         
         Esp32EnrollResponseDTO response = esp32WebClient.post()
-                .uri("/api/enroll")
+                .uri("/api/fingerprint/enroll")
                 .contentType(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .bodyToMono(Esp32EnrollResponseDTO.class)
@@ -215,7 +215,7 @@ public class Esp32HttpServiceImpl implements SerialService {
         log.info("Iniciando verificación de huella en ESP32...");
         
         Esp32VerifyResponseDTO response = esp32WebClient.post()
-                .uri("/api/verify")
+                .uri("/api/fingerprint/verify")
                 .contentType(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .bodyToMono(Esp32VerifyResponseDTO.class)
