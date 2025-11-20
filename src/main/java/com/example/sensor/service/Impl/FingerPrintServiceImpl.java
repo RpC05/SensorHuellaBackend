@@ -6,7 +6,6 @@ import com.example.sensor.mapper.FingerPrintMapper;
 import com.example.sensor.model.dto.EnrollProgressDTO;
 import com.example.sensor.model.dto.FingerPrintRequestDTO;
 import com.example.sensor.model.dto.FingerPrintResponseDTO;
-import com.example.sensor.model.dto.FingerPrintUpdateDTO;
 import com.example.sensor.model.dto.FingerPrintVerifyResponseDTO;
 import com.example.sensor.model.entity.FingerPrint;
 import com.example.sensor.repository.FingerPrintRepository;
@@ -138,44 +137,6 @@ public class FingerPrintServiceImpl implements FingerPrintService {
                 .messages(messages)
                 .fingerprint(mapper.toResponseDto(saved))
                 .build();
-    }
-
-    @Override
-    public FingerPrintResponseDTO updateFingerprint(Integer id, FingerPrintUpdateDTO updateDto) {
-        if (id == null) {
-            throw new IllegalArgumentException("El ID no puede ser null");
-        }
-        
-        FingerPrint fingerprint = repository.findById(id)
-                .orElseThrow(() -> new FingerPrintNotFoundException(id));
-        
-        // Actualizar solo los campos que vienen en el body
-        if (updateDto.getNombres() != null) {
-            fingerprint.setNombres(updateDto.getNombres());
-        }
-        if (updateDto.getApellidoPaterno() != null) {
-            fingerprint.setApellidoPaterno(updateDto.getApellidoPaterno());
-        }
-        if (updateDto.getApellidoMaterno() != null) {
-            fingerprint.setApellidoMaterno(updateDto.getApellidoMaterno());
-        }
-        if (updateDto.getFechaNacimiento() != null) {
-            fingerprint.setFechaNacimiento(updateDto.getFechaNacimiento());
-        }
-        if (updateDto.getTipoDocumento() != null) {
-            fingerprint.setTipoDocumento(updateDto.getTipoDocumento());
-        }
-        if (updateDto.getNumeroDocumento() != null) {
-            fingerprint.setNumeroDocumento(updateDto.getNumeroDocumento());
-        }
-        if (updateDto.getDescription() != null) {
-            fingerprint.setDescription(updateDto.getDescription());
-        }
-        
-        FingerPrint updated = repository.save(fingerprint);
-        log.info("Huella ID:{} actualizada", id);
-        
-        return mapper.toResponseDto(updated);
     }
 
     @Override
