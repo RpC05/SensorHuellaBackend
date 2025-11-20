@@ -3,6 +3,7 @@ package com.example.sensor.api;
 import com.example.sensor.model.dto.EnrollProgressDTO;
 import com.example.sensor.model.dto.FingerPrintRequestDTO;
 import com.example.sensor.model.dto.FingerPrintResponseDTO;
+import com.example.sensor.model.dto.FingerPrintUpdateDTO;
 import com.example.sensor.model.dto.FingerPrintVerifyResponseDTO;
 import com.example.sensor.service.FingerPrintService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,11 @@ import java.util.List;
 @Slf4j
 public class FingerPrintController {
     private final FingerPrintService fingerprintService;
+
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("OK");
+    }
 
     @GetMapping
     public ResponseEntity<List<FingerPrintResponseDTO>> getAllFingerprints() {
@@ -47,6 +53,15 @@ public class FingerPrintController {
         } else {
             return ResponseEntity.badRequest().body(result);
         }
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<FingerPrintResponseDTO> updateFingerprint(
+            @PathVariable Integer id,
+            @RequestBody FingerPrintUpdateDTO updateDto) {
+        log.info("PATCH /api/fingerprints/{} - Actualizando datos", id);
+        FingerPrintResponseDTO updated = fingerprintService.updateFingerprint(id, updateDto);
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
