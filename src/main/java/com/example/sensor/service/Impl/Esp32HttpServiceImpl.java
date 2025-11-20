@@ -94,7 +94,7 @@ public class Esp32HttpServiceImpl implements SerialService {
      */
     private String ping() {
         log.debug("Haciendo ping al ESP32...");
-        
+
         String response = esp32WebClient.get()
                 .uri("/api/fingerprint/ping")
                 .retrieve()
@@ -112,7 +112,7 @@ public class Esp32HttpServiceImpl implements SerialService {
      */
     private String getCount() {
         log.info("Consultando conteo de huellas al ESP32...");
-        
+
         Esp32CountResponseDTO response = esp32WebClient.get()
                 .uri("/api/fingerprint/count")
                 .retrieve()
@@ -126,7 +126,7 @@ public class Esp32HttpServiceImpl implements SerialService {
             log.info("<<< ESP32: {}", result);
             return result;
         }
-        
+
         throw new SerialCommunicationException("No se recibió respuesta del conteo");
     }
 
@@ -135,7 +135,7 @@ public class Esp32HttpServiceImpl implements SerialService {
      */
     private String deleteFingerprint(String id) {
         log.info("Eliminando huella ID {} en el ESP32...", id);
-        
+
         String response = esp32WebClient.delete()
                 .uri("/api/fingerprint/{id}", id)
                 .retrieve()
@@ -153,7 +153,7 @@ public class Esp32HttpServiceImpl implements SerialService {
      */
     private String emptyDatabase() {
         log.info("Vaciando base de datos del sensor...");
-        
+
         String response = esp32WebClient.delete()
                 .uri("/api/fingerprint/empty")
                 .retrieve()
@@ -171,7 +171,7 @@ public class Esp32HttpServiceImpl implements SerialService {
      */
     private List<String> enrollFingerprint() {
         log.info("Iniciando proceso de enroll en ESP32...");
-        
+
         Esp32EnrollResponseDTO response = esp32WebClient.post()
                 .uri("/api/fingerprint/enroll")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -191,7 +191,7 @@ public class Esp32HttpServiceImpl implements SerialService {
         log.info("<<< ESP32: Enroll completado con status: {}", response.getStatus());
 
         List<String> messages = new ArrayList<>();
-        
+
         if (response.getMessages() != null) {
             messages.addAll(response.getMessages());
         }
@@ -213,7 +213,7 @@ public class Esp32HttpServiceImpl implements SerialService {
      */
     private List<String> verifyFingerprint() {
         log.info("Iniciando verificación de huella en ESP32...");
-        
+
         Esp32VerifyResponseDTO response = esp32WebClient.post()
                 .uri("/api/fingerprint/verify")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -234,7 +234,7 @@ public class Esp32HttpServiceImpl implements SerialService {
         messages.add(response.getMessage());
 
         if (Boolean.TRUE.equals(response.getFound())) {
-            String matchMessage = String.format("Found ID #%d with confidence of %d", 
+            String matchMessage = String.format("Found ID #%d with confidence of %d",
                     response.getId(), response.getConfidence());
             messages.add(matchMessage);
             log.info("<<< ESP32: {}", matchMessage);
@@ -243,5 +243,71 @@ public class Esp32HttpServiceImpl implements SerialService {
         }
 
         return messages;
+    }
+
+    /**
+     * Escanear tarjeta RFID (espera física de tarjeta)
+     * Llama al ESP32 para que espere una tarjeta y devuelve el UID detectado
+     */
+    public String scanRfidCard() {
+        log.info("Solicitando escaneo de tarjeta RFID al ESP32...");
+
+        // Create DTO simple para la respuesta
+        var response = esp32WebClient.post()
+                .uri("/api/rfid/scan")
+                .contentType(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .bodyToMono(RfidScanResponse.class)
+                .timeout(Duration.ofMillis(config.getReadTimeout()))
+                .onErrorResume(WebClientResponseException.class, e -> {
+                    log.error("Error HTTP escaneando RFID: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+                    return Mono.error(new SerialCommunicationException("Error en RFID scan: " + e.getMessage()));
+                })
+                .block();
+
+        if (response == null) {
+            throw new SerialCommunicationException("No se recibió respuesta del escaneo RFID");
+        }
+
+        if (!Boolean.TRUE.equals(response.getSuccess())) {
+            throw new SerialCommunicationException(
+                    response.getMessage() != null ? response.getMessage() : "No se detectó tarjeta");
+        }
+
+        log.info("<<< ESP32: Tarjeta detectada con UID: {}", response.getUid());
+        return response.getUid();
+    }
+
+    /**
+     * DTO interno para parsear respuesta del ESP32 RFID scan
+     */
+    private static class RfidScanResponse {
+        private Boolean success;
+        private String uid;
+        private String message;
+
+        public Boolean getSuccess() {
+            return success;
+        }
+
+        public void setSuccess(Boolean success) {
+            this.success = success;
+        }
+
+        public String getUid() {
+            return uid;
+        }
+
+        public void setUid(String uid) {
+            this.uid = uid;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
     }
 }

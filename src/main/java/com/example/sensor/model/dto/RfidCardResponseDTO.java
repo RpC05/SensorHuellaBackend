@@ -14,19 +14,11 @@ import lombok.NoArgsConstructor;
 public class RfidCardResponseDTO {
     private Integer id;
     private String cardUid;
-    private String nombres;
-    private String apellidoPaterno;
-    private String apellidoMaterno;
-    private String fullName;
-    private String tipoDocumento;
-    private String numeroDocumento;
-    private String email;
-    private String telefono;
-    private String cargo;
-    private String areaDepartamento;
     private Boolean active;
     private Boolean authorized;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private String notes;
+
+    // Información del usuario asociado (si existe)
+    private UserResponseDTO user;
 }

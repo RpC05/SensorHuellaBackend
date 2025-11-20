@@ -18,23 +18,22 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class FingerPrint {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY) 
-    @Column(name="fprint_id_int", nullable = false, unique = true)
+    @Column(name = "fprint_id_int", nullable = false, unique = true)
     private Integer fingerprintId;
 
-    @Column(name="fprint_estado_bol", nullable = false)
+    @Column(name = "fprint_estado_bol", nullable = false)
     @Builder.Default
     private Boolean active = true;
 
     @CreationTimestamp
-    @Column(name="fprint_cre_dt", updatable = false)
+    @Column(name = "fprint_cre_dt", updatable = false)
     private LocalDateTime enrolledAt;
 
     @UpdateTimestamp
-    @Column(name="fprint_upd_dt")
+    @Column(name = "fprint_upd_dt")
     private LocalDateTime updatedAt;
 
     @OneToOne
-    @JoinColumn(name = "usr_id_int", nullable = false, unique = true)
+    @JoinColumn(name = "usr_id_int", nullable = true, unique = true)
     private User user;
 }

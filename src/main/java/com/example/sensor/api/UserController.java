@@ -1,5 +1,6 @@
 package com.example.sensor.api;
 
+import com.example.sensor.model.dto.AssignFingerPrintDTO;
 import com.example.sensor.model.dto.AssignRfidCardDTO;
 import com.example.sensor.model.dto.UserRequestDTO;
 import com.example.sensor.model.dto.UserResponseDTO;
@@ -18,7 +19,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class UserController {
-    
+
     private final UserService userService;
 
     @PostMapping
@@ -29,15 +30,13 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
-        List<UserResponseDTO> users = userService.getAllUsers();
-        return ResponseEntity.ok(users);
+    public ResponseEntity<List<UserResponseDTO>> getAllUsers() { 
+        return ResponseEntity.ok(userService.getAllUsers());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UserResponseDTO> getUserById(@PathVariable Integer id) {
-        UserResponseDTO user = userService.getUserById(id);
-        return ResponseEntity.ok(user);
+    public ResponseEntity<UserResponseDTO> getUserById(@PathVariable Integer id) { 
+        return ResponseEntity.ok(userService.getUserById(id));
     }
 
     @PutMapping("/{id}")
@@ -60,8 +59,15 @@ public class UserController {
     public ResponseEntity<UserResponseDTO> assignRfidCard(
             @PathVariable Integer id,
             @Valid @RequestBody AssignRfidCardDTO assignDTO) {
-        log.info("POST /users/{}/rfid - Asignando tarjeta", id);
-        UserResponseDTO updated = userService.assignRfidCard(id, assignDTO);
-        return ResponseEntity.ok(updated);
+        log.info("POST /users/{}/rfid - Asignando tarjeta", id); 
+        return ResponseEntity.ok(userService.assignRfidCard(id, assignDTO));
+    }
+
+    @PostMapping("/{id}/fingerprint")
+    public ResponseEntity<UserResponseDTO> assignFingerPrint(
+            @PathVariable Integer id,
+            @Valid @RequestBody AssignFingerPrintDTO assignDTO) {
+        log.info("POST /users/{}/fingerprint - Asignando huella", id); 
+        return ResponseEntity.ok(userService.assignFingerPrint(id, assignDTO));
     }
 }

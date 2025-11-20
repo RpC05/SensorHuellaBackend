@@ -18,45 +18,32 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class AccessControlController {
-    
+
     private final AccessControlService accessService;
-    
+
     @PostMapping("/cards")
-    public ResponseEntity<RfidCardResponseDTO> registerCard(
-            @Valid @RequestBody RfidCardRequestDTO requestDTO) {
-        log.info("POST /access/cards - Registrando tarjeta: {}", requestDTO.getCardUid());
-        RfidCardResponseDTO response = accessService.registerCard(requestDTO);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    public ResponseEntity<RfidCardResponseDTO> registerCard() {
+        log.info("POST /access/cards - Iniciando escaneo de tarjeta RFID...");
+        return ResponseEntity.status(HttpStatus.CREATED).body(accessService.registerCardWithScan());
     }
-    
+
     @GetMapping("/cards")
-    public ResponseEntity<List<RfidCardResponseDTO>> getAllCards() {
-        List<RfidCardResponseDTO> cards = accessService.getAllCards();
-        return ResponseEntity.ok(cards);
+    public ResponseEntity<List<RfidCardResponseDTO>> getAllCards() { 
+        return ResponseEntity.ok(accessService.getAllCards());
     }
-    
+
     @GetMapping("/cards/uid/{cardUid}")
-    public ResponseEntity<RfidCardResponseDTO> getCardByUid(@PathVariable String cardUid) {
-        RfidCardResponseDTO card = accessService.getCardByUid(cardUid);
-        return ResponseEntity.ok(card);
+    public ResponseEntity<RfidCardResponseDTO> getCardByUid(@PathVariable String cardUid) { 
+        return ResponseEntity.ok(accessService.getCardByUid(cardUid));
     }
-    
-    @PutMapping("/cards/{id}")
-    public ResponseEntity<RfidCardResponseDTO> updateCard(
-            @PathVariable Integer id,
-            @Valid @RequestBody RfidCardRequestDTO requestDTO) {
-        log.info("PUT /access/cards/{} - Actualizando tarjeta", id);
-        RfidCardResponseDTO updated = accessService.updateCard(id, requestDTO);
-        return ResponseEntity.ok(updated);
-    }
-    
+
     @DeleteMapping("/cards/{id}")
     public ResponseEntity<Void> deleteCard(@PathVariable Integer id) {
         log.info("DELETE /access/cards/{} - Eliminando tarjeta", id);
         accessService.deleteCard(id);
         return ResponseEntity.noContent().build();
     }
-    
+
     @PatchMapping("/cards/{id}/toggle-auth")
     public ResponseEntity<Void> toggleAuthorization(@PathVariable Integer id) {
         log.info("PATCH /access/cards/{}/toggle-auth", id);
@@ -64,49 +51,33 @@ public class AccessControlController {
         return ResponseEntity.ok().build();
     }
 
-    // ==================== REGISTRO DE ACCESOS ====================
-    
-    /**
-     * Endpoint principal que llama el ESP32 cuando se lee una tarjeta
-     */
     @PostMapping("/register")
     public ResponseEntity<AccessRegisterResponseDTO> registerAccess(
             @Valid @RequestBody AccessRegisterRequestDTO requestDTO) {
-        log.info("POST /access/register - UID: {}", requestDTO.getCardUid());
-        AccessRegisterResponseDTO response = accessService.registerAccess(requestDTO);
-        return ResponseEntity.ok(response);
+        log.info("POST /access/register - UID: {}", requestDTO.getCardUid()); 
+        return ResponseEntity.ok(accessService.registerAccess(requestDTO));
     }
 
-    // ==================== CONSULTA DE LOGS ====================
-    
     @GetMapping("/logs")
     public ResponseEntity<List<AccessLogResponseDTO>> getAccessLogs(
-            @RequestParam(required = false) 
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
-            @RequestParam(required = false) 
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
-        
-        if (start == null) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+
+        if (start == null)
             start = LocalDateTime.now().minusDays(7);
-        }
-        if (end == null) {
+        if (end == null)
             end = LocalDateTime.now();
-        }
-        
-        List<AccessLogResponseDTO> logs = accessService.getAccessLogs(start, end);
-        return ResponseEntity.ok(logs);
+        return ResponseEntity.ok(accessService.getAccessLogs(start, end));
     }
-    
+
     @GetMapping("/logs/today")
-    public ResponseEntity<List<AccessLogResponseDTO>> getTodayAccesses() {
-        List<AccessLogResponseDTO> logs = accessService.getTodayAccesses();
-        return ResponseEntity.ok(logs);
+    public ResponseEntity<List<AccessLogResponseDTO>> getTodayAccesses() { 
+        return ResponseEntity.ok(accessService.getTodayAccesses());
     }
-    
+
     @GetMapping("/logs/card/{cardUid}")
     public ResponseEntity<List<AccessLogResponseDTO>> getAccessLogsByCard(
-            @PathVariable String cardUid) {
-        List<AccessLogResponseDTO> logs = accessService.getAccessLogsByCard(cardUid);
-        return ResponseEntity.ok(logs);
+            @PathVariable String cardUid) { 
+        return ResponseEntity.ok(accessService.getAccessLogsByCard(cardUid));
     }
 }
