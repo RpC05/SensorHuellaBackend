@@ -87,16 +87,13 @@ public class FingerPrintServiceImpl implements FingerPrintService {
                     int finalCount = Integer.parseInt(countStr.replaceAll("\\D+", ""));
 
                     if (finalCount > initialCount) {
-                        // Asumimos que el nuevo ID es el último (esto funciona si los IDs son
-                        // secuenciales)
+                        // Asumimos que el nuevo ID es el último (esto funciona porque los IDs son secuenciales)
                         // El sensor AS608 suele asignar el primer ID libre.
-                        // Si el conteo subió, ES MUY PROBABLE que sea el ID = finalCount (si no hubo
-                        // huecos)
+                        // Si el conteo subió, ES MUY PROBABLE que sea el ID = finalCount (si no hubo huecos)
                         // O mejor, asumimos que el ID es finalCount si partimos de 0 o secuencial.
                         // Riesgo: Si había huecos (borrados), el ID podría ser otro.
                         // Pero es mejor intentar guardar algo que perderlo.
-                        // En el firmware: id = finger.templateCount + 1; -> Esto confirma que usa
-                        // (count + 1)
+                        // En el firmware: id = finger.templateCount + 1; -> Esto confirma que usa (count + 1)
                         // PERO ojo, templateCount se actualiza despues de guardar.
 
                         // Si el firmware hace: id = templateCount + 1 (antes de guardar)

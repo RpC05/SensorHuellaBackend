@@ -13,11 +13,8 @@ public class WebSecurityConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true);
-        config.setAllowedOrigins(Arrays.asList(
-            "http://localhost:3000",
-            "http://localhost:3001"
-        ));
+        config.setAllowCredentials(false);
+        config.setAllowedOriginPatterns(Arrays.asList("*"));
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setMaxAge(3600L);
