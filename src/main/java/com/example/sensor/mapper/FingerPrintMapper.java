@@ -1,26 +1,27 @@
 package com.example.sensor.mapper;
 
-import com.example.sensor.model.dto.FingerPrintRequestDTO;
 import com.example.sensor.model.dto.FingerPrintResponseDTO;
 import com.example.sensor.model.entity.FingerPrint;
 import lombok.RequiredArgsConstructor;
-import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
 public class FingerPrintMapper {
-    private final ModelMapper modelMapper;
 
-    public FingerPrint toEntity(FingerPrintRequestDTO fingerPrintRequestDTO) {
-        return modelMapper.map(fingerPrintRequestDTO, FingerPrint.class);
-    }
+    private final UserMapper userMapper;
 
     public FingerPrintResponseDTO toResponseDto(FingerPrint fingerPrint) {
-        return modelMapper.map(fingerPrint, FingerPrintResponseDTO.class);
-    }
+        if (fingerPrint == null) {
+            return null;
+        }
 
-    public void updateEntityFromDto(FingerPrintRequestDTO requestDto, FingerPrint fingerPrint) {
-        modelMapper.map(requestDto, fingerPrint);
+        return FingerPrintResponseDTO.builder()
+                .fingerprintId(fingerPrint.getFingerprintId())
+                .active(fingerPrint.getActive())
+                .enrolledAt(fingerPrint.getEnrolledAt())
+                .updatedAt(fingerPrint.getUpdatedAt())
+                .user(fingerPrint.getUser() != null ? userMapper.toResponseDTO(fingerPrint.getUser()) : null)
+                .build();
     }
 }

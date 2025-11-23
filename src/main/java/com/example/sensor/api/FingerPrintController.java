@@ -3,10 +3,8 @@ package com.example.sensor.api;
 import com.example.sensor.model.dto.EnrollProgressDTO;
 import com.example.sensor.model.dto.FingerPrintRequestDTO;
 import com.example.sensor.model.dto.FingerPrintResponseDTO;
-import com.example.sensor.model.dto.FingerPrintUpdateDTO;
 import com.example.sensor.model.dto.FingerPrintVerifyResponseDTO;
 import com.example.sensor.service.FingerPrintService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,11 +20,6 @@ import java.util.List;
 public class FingerPrintController {
     private final FingerPrintService fingerprintService;
 
-    @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("OK");
-    }
-
     @GetMapping
     public ResponseEntity<List<FingerPrintResponseDTO>> getAllFingerprints() {
         List<FingerPrintResponseDTO> fingerprints = fingerprintService.findAll();
@@ -41,8 +34,12 @@ public class FingerPrintController {
 
     @PostMapping
     public ResponseEntity<EnrollProgressDTO> enrollFingerprint(
-            @Valid @RequestBody FingerPrintRequestDTO requestDto) {
-        log.info("POST /api/fingerprints - Enrollando nueva huella para: {}", requestDto.getNombres());
+            @RequestBody(required = false) FingerPrintRequestDTO requestDto) {
+        log.info("POST /api/fingerprints - Iniciando proceso de enroll de huella");
+        // Crear DTO vacío si no se envió body
+        if (requestDto == null) {
+            requestDto = new FingerPrintRequestDTO();
+        }
         EnrollProgressDTO result = fingerprintService.enrollFingerprint(requestDto);
 
         if ("SUCCESS".equals(result.getStatus())) {
@@ -50,15 +47,6 @@ public class FingerPrintController {
         } else {
             return ResponseEntity.badRequest().body(result);
         }
-    }
-
-    @PatchMapping("/{id}")
-    public ResponseEntity<FingerPrintResponseDTO> updateFingerprint(
-            @PathVariable Integer id,
-            @RequestBody FingerPrintUpdateDTO updateDto) {
-        log.info("PATCH /api/fingerprints/{} - Actualizando datos", id);
-        FingerPrintResponseDTO updated = fingerprintService.updateFingerprint(id, updateDto);
-        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
