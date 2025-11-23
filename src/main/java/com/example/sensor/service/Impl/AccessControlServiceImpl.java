@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -102,13 +103,19 @@ public class AccessControlServiceImpl implements AccessControlService {
         boolean authorized = card != null && Boolean.TRUE.equals(card.getAuthorized());
 
         // Determinar tipo de acceso (ENTRADA/SALIDA) basado en el último registro
-        AccessType accessType = AccessType.ENTRADA;
+        AccessType accessType = AccessType.ENTRADA; // Por defecto es ENTRADA
 
         if (card != null) {
-            logRepository.findLastAccessByCard(card.getId()).ifPresent(lastAccess -> {
-                // Si el último fue ENTRADA, ahora es SALIDA
-                // Implementar lógica si es necesario
-            });
+            // Buscar el último acceso de esta tarjeta
+            Optional<AccessLog> lastAccess = logRepository.findLastAccessByCard(card.getId());
+
+            if (lastAccess.isPresent()) {
+                // Alternar: Si el último fue ENTRADA, ahora es SALIDA y viceversa
+                accessType = lastAccess.get().getAccessType() == AccessType.ENTRADA
+                        ? AccessType.SALIDA
+                        : AccessType.ENTRADA;
+            }
+            // Si no hay acceso previo, se mantiene ENTRADA (default)
         }
 
         // Crear log de acceso
