@@ -24,12 +24,13 @@
 #include <WebServer.h>
 #include <Adafruit_Fingerprint.h>
 #include <ArduinoJson.h>
+#include <ESPmDNS.h>
 
 // ============================================
 // CONFIGURACIÓN WiFi (MODIFICAR CON TUS DATOS)
 // ============================================
-const char* WIFI_SSID = "TU_RED_WIFI";        // Cambia esto
-const char* WIFI_PASSWORD = "TU_PASSWORD";    // Cambia esto
+const char* WIFI_SSID = "*********";        // Cambia esto
+const char* WIFI_PASSWORD = "**********";    // Cambia esto
 
 // ============================================
 // CONFIGURACIÓN DEL SERVIDOR
@@ -100,6 +101,12 @@ void setup() {
     Serial.println("Verifica SSID y password");
     while (1) { delay(1); }
   }
+
+  if (MDNS.begin("sensorupaoiot")) { // El nombre del dispositivo será "sensor"
+    Serial.println("mDNS iniciado. Hostname: http://sensorupaoiot.local");
+  } else {
+    Serial.println("Error iniciando mDNS");
+  }
   
   Serial.println(" Conectado!");
   Serial.print("IP Address: ");
@@ -113,7 +120,7 @@ void setup() {
   server.on("/api/empty", HTTP_DELETE, handleEmpty);
   
   // Endpoint con parámetro de ruta para DELETE
-  server.on(UriRegex("^\\/api\\/fingerprint\\/([0-9]+)$"), HTTP_DELETE, handleDeleteFingerprint);
+  server.on("/api/fingerprint/*", HTTP_DELETE, handleDeleteFingerprint);
   
   // Endpoint para 404
   server.onNotFound(handleNotFound);
@@ -362,6 +369,7 @@ bool performEnroll() {
   // Primera imagen
   int p = -1;
   while (p != FINGERPRINT_OK) {
+    server.handleClient(); // Mantener servidor vivo durante espera
     p = finger.getImage();
     if (p == FINGERPRINT_NOFINGER) {
       delay(50);
@@ -387,10 +395,11 @@ bool performEnroll() {
   // Solicitar remover dedo
   enrollState.addMessage("Remove finger");
   Serial.println("Remueva el dedo...");
-  delay(2000);
+  delay(20);
   
   p = 0;
   while (p != FINGERPRINT_NOFINGER) {
+    server.handleClient(); // Mantener servidor vivo durante espera
     p = finger.getImage();
     delay(50);
   }
@@ -401,6 +410,7 @@ bool performEnroll() {
   
   p = -1;
   while (p != FINGERPRINT_OK) {
+    server.handleClient(); // Mantener servidor vivo durante espera
     p = finger.getImage();
     if (p == FINGERPRINT_NOFINGER) {
       delay(50);

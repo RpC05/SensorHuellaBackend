@@ -5,7 +5,6 @@ import com.example.sensor.model.dto.FingerPrintRequestDTO;
 import com.example.sensor.model.dto.FingerPrintResponseDTO;
 import com.example.sensor.model.dto.FingerPrintVerifyResponseDTO;
 import com.example.sensor.service.FingerPrintService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -35,8 +34,12 @@ public class FingerPrintController {
 
     @PostMapping
     public ResponseEntity<EnrollProgressDTO> enrollFingerprint(
-            @Valid @RequestBody FingerPrintRequestDTO requestDto) {
-        log.info("POST /api/fingerprints - Enrollando nueva huella para: {}", requestDto.getNombres());
+            @RequestBody(required = false) FingerPrintRequestDTO requestDto) {
+        log.info("POST /api/fingerprints - Iniciando proceso de enroll de huella");
+        // Crear DTO vacío si no se envió body
+        if (requestDto == null) {
+            requestDto = new FingerPrintRequestDTO();
+        }
         EnrollProgressDTO result = fingerprintService.enrollFingerprint(requestDto);
 
         if ("SUCCESS".equals(result.getStatus())) {
