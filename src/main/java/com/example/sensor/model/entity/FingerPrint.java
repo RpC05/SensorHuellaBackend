@@ -18,10 +18,18 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class FingerPrint {
     @Id
+<<<<<<< Updated upstream
     @Column(name = "fprint_id_int", nullable = false, unique = true)
     private Integer fingerprintId;
 
     @Column(name = "fprint_estado_bol", nullable = false)
+=======
+    @GeneratedValue(strategy = GenerationType.IDENTITY) 
+    @Column(name="fprint_id_int", nullable = false, unique = true)
+    private Integer fingerprintId;
+
+    @Column(name="fprint_estado_bol", nullable = false)
+>>>>>>> Stashed changes
     @Builder.Default
     private Boolean active = true;
 
@@ -34,6 +42,10 @@ public class FingerPrint {
     private LocalDateTime updatedAt;
 
     @OneToOne
+<<<<<<< Updated upstream
     @JoinColumn(name = "usr_id_int", nullable = true, unique = true)
+=======
+    @JoinColumn(name = "usr_id_int", nullable = false, unique = true)
+>>>>>>> Stashed changes
     private User user;
 }

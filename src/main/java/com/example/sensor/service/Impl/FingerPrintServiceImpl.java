@@ -119,6 +119,7 @@ public class FingerPrintServiceImpl implements FingerPrintService {
         }
     }
 
+<<<<<<< Updated upstream
     private EnrollProgressDTO saveFingerprintAndReturn(Integer fingerprintId, List<String> messages) {
         // Crear FingerPrint solo con el ID del ESP32, sin usuario
         FingerPrint fingerprint = FingerPrint.builder()
@@ -134,6 +135,20 @@ public class FingerPrintServiceImpl implements FingerPrintService {
                 .messages(messages)
                 .fingerprint(mapper.toResponseDto(saved))
                 .build();
+=======
+    @Override
+    public FingerPrintResponseDTO updateFingerprint(Integer id, FingerPrintUpdateDTO updateDto) {
+        if (id == null) {
+            throw new IllegalArgumentException("El ID no puede ser null");
+        }
+        
+        FingerPrint fingerprint = repository.findById(id)
+                .orElseThrow(() -> new FingerPrintNotFoundException(id));
+        FingerPrint updated = repository.save(fingerprint);
+        log.info("Huella ID:{} actualizada", id);
+        
+        return mapper.toResponseDto(updated);
+>>>>>>> Stashed changes
     }
 
     @Override
