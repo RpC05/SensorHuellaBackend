@@ -28,12 +28,12 @@ public class AccessControlController {
     }
 
     @GetMapping("/cards")
-    public ResponseEntity<List<RfidCardResponseDTO>> getAllCards() { 
+    public ResponseEntity<List<RfidCardResponseDTO>> getAllCards() {
         return ResponseEntity.ok(accessService.getAllCards());
     }
 
     @GetMapping("/cards/uid/{cardUid}")
-    public ResponseEntity<RfidCardResponseDTO> getCardByUid(@PathVariable String cardUid) { 
+    public ResponseEntity<RfidCardResponseDTO> getCardByUid(@PathVariable String cardUid) {
         return ResponseEntity.ok(accessService.getCardByUid(cardUid));
     }
 
@@ -51,10 +51,17 @@ public class AccessControlController {
         return ResponseEntity.ok().build();
     }
 
+    @PatchMapping("/cards/{id}/toggle-active")
+    public ResponseEntity<Void> toggleActiveState(@PathVariable Integer id) {
+        log.info("PATCH /access/cards/{}/toggle-active", id);
+        accessService.toggleCardActiveState(id);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/register")
     public ResponseEntity<AccessRegisterResponseDTO> registerAccess(
             @Valid @RequestBody AccessRegisterRequestDTO requestDTO) {
-        log.info("POST /access/register - UID: {}", requestDTO.getCardUid()); 
+        log.info("POST /access/register - UID: {}", requestDTO.getCardUid());
         return ResponseEntity.ok(accessService.registerAccess(requestDTO));
     }
 
@@ -71,13 +78,13 @@ public class AccessControlController {
     }
 
     @GetMapping("/logs/today")
-    public ResponseEntity<List<AccessLogResponseDTO>> getTodayAccesses() { 
+    public ResponseEntity<List<AccessLogResponseDTO>> getTodayAccesses() {
         return ResponseEntity.ok(accessService.getTodayAccesses());
     }
 
     @GetMapping("/logs/card/{cardUid}")
     public ResponseEntity<List<AccessLogResponseDTO>> getAccessLogsByCard(
-            @PathVariable String cardUid) { 
+            @PathVariable String cardUid) {
         return ResponseEntity.ok(accessService.getAccessLogsByCard(cardUid));
     }
 }
