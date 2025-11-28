@@ -16,6 +16,8 @@ public interface AccessControlService {
 
     void toggleCardAuthorization(Integer id);
 
+    void toggleCardActiveState(Integer id);
+
     AccessRegisterResponseDTO registerAccess(AccessRegisterRequestDTO requestDTO);
 
     List<AccessLogResponseDTO> getAccessLogs(LocalDateTime start, LocalDateTime end);
