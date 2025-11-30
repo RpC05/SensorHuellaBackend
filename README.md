@@ -113,13 +113,27 @@ Anota la URL pública (ej: `https://abc123.trycloudflare.com`)
 
 ## 🧪 Testing
 
-### Test local (con ESP32 en red local)
+### Configuración para Pruebas Locales (Backend en PC + ESP32)
+
+Para que el sistema funcione correctamente en local, necesitas configurar la comunicación en ambas direcciones:
+
+1. **ESP32 ➡️ Backend (Registrar accesos):**
+   - El ESP32 necesita llegar a tu PC.
+   - **Opción A (IP Local):** En el código `.ino`, usa la IP de tu PC: `const char* BACKEND_URL = "http://192.168.X.X:8080";`
+   - **Opción B (Túnel):** Usa un túnel Cloudflare que apunte a `localhost:8080`.
+
+2. **Backend ➡️ ESP32 (Enrollar huellas):**
+   - El backend necesita llegar al ESP32.
+   - En `.env`, usa mDNS o IP directa: `ESP32_BASE_URL=http://sensorupaoiot.local` o `http://192.168.X.X`.
+   - **Nota:** Si usas un túnel para el ESP32, asegúrate de que `cloudflared` esté corriendo en la misma red para poder resolver `sensorupaoiot.local`.
+
+### Comandos de Prueba Manual
 
 ```bash
 # Health check
 curl http://localhost:8080/fingerprints/count
 
-# Enroll
+# Enroll (Inicia proceso en ESP32)
 curl -X POST http://localhost:8080/fingerprints \
   -H "Content-Type: application/json" \
   -d '{"nombres":"Juan Perez","codigo":"12345"}'

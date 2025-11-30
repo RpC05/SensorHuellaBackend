@@ -18,14 +18,14 @@
 // ============================================
 // CONFIGURACIÓN BACKEND
 // ============================================
-const char* BACKEND_URL = "https://sensorhuellabackend.onrender.com";
+const char* BACKEND_URL = "http://ipLocal:8080"; // para pruebas ip local, para produccion, url directamente
 const char* ACCESS_ENDPOINT = "/api/v1/access/register";
 
 // ============================================
 // CONFIGURACIÓN WiFi
 // ============================================
-const char* WIFI_SSID = "7moPiso";
-const char* WIFI_PASSWORD = "NTJEM12345678910";
+const char* WIFI_SSID = "**********";
+const char* WIFI_PASSWORD = "************";
 
 // ============================================
 // CONFIGURACIÓN PINES
@@ -52,6 +52,12 @@ Servo puertaServo; // Objeto del Servo
 const int ANGULO_CERRADO = 0;
 const int ANGULO_ABIERTO = 90;
 const int TIEMPO_PUERTA = 4000; // 4 segundos
+
+// ============================================
+// VARIABLES PARA VERIFICACIÓN AUTOMÁTICA DE HUELLA
+// ============================================
+unsigned long lastFingerprintCheck = 0;
+const unsigned long FINGERPRINT_CHECK_INTERVAL = 2000; // Escanear cada 2 segundos
 
 // ============================================
 // ESTRUCTURAS DE DATOS
@@ -202,9 +208,8 @@ void setup() {
 // ============================================
 void loop() {
   server.handleClient();
-  
-  // Auto-detección de tarjeta RFID (opcional, para mostrar en LCD)
-  checkRfidCard();
+  checkRfidCard(); // Auto-detección de tarjeta RFID
+  checkFingerprintAuto(); // Auto-detección de huella digital
 }
 
 // ============================================
@@ -464,6 +469,7 @@ void sendAccessToBackend(String cardUid) {
   doc["cardUid"] = cardUid;
   doc["location"] = "Puerta Principal";
   doc["deviceId"] = "ESP32-001";
+  doc["authenticationMethod"] = "RFID";
   String payload;
   serializeJson(doc, payload);
   Serial.printf("Enviando al backend: %s\n", payload.c_str());
@@ -486,9 +492,10 @@ void sendAccessToBackend(String cardUid) {
         lcd.setCursor(0, 1);
         lcd.print(personName.substring(0, 16));
         
-        // === TAMBIÉN ABRIMOS SI EL BACKEND DICE OK A LA TARJETA ===
-        abrirPuerta();
-        
+        // === NOTA: RFID YA NO ABRE LA PUERTA ===
+        // Solo la huella digital puede abrir la puerta
+        // La tarjeta RFID solo registra el acceso
+        // abrirPuerta(); 
       } else {
         lcd.setCursor(0, 0);
         lcd.print("ACCESO DENEGADO");
@@ -629,6 +636,95 @@ bool performEnroll() {
     enrollState.addMessage("Error writing to flash");
     return false;
   }
+}
+
+// ============================================
+// FUNCIÓN: VERIFICACIÓN AUTOMÁTICA DE HUELLA
+// ============================================
+void checkFingerprintAuto() {
+  unsigned long currentTime = millis();
+  
+  // Escanear cada 2 segundos para no saturar
+  if (currentTime - lastFingerprintCheck < FINGERPRINT_CHECK_INTERVAL) {
+    return;
+  }
+  
+  lastFingerprintCheck = currentTime;
+  
+  uint8_t p = finger.getImage();
+  if (p != FINGERPRINT_OK) return; // No hay dedo
+  
+  p = finger.image2Tz();
+  if (p != FINGERPRINT_OK) return; // Imagen mala
+  
+  p = finger.fingerFastSearch();
+  if (p == FINGERPRINT_OK) {
+    // Huella encontrada - enviar al backend
+    Serial.printf("Huella detectada automáticamente: ID #%d, Confidence: %d\n", 
+                  finger.fingerID, finger.confidence);
+    sendFingerprintAccessToBackend(finger.fingerID, finger.confidence);
+  }
+}
+
+// ============================================
+// FUNCIÓN: ENVIAR ACCESO DE HUELLA AL BACKEND
+// ============================================
+void sendFingerprintAccessToBackend(uint8_t fingerprintId, uint16_t confidence) {
+  HTTPClient http;
+  String fullUrl = String(BACKEND_URL) + "/api/v1/fingerprints/access";
+  http.begin(fullUrl);
+  http.addHeader("Content-Type", "application/json");
+  
+  JsonDocument doc;
+  doc["fingerprintId"] = fingerprintId;
+  doc["confidence"] = confidence;
+  doc["location"] = "Puerta Principal";
+  doc["deviceId"] = "ESP32-001";
+  doc["authenticationMethod"] = "FINGERPRINT";
+  
+  String payload;
+  serializeJson(doc, payload);
+  Serial.printf("Enviando huella al backend: %s\n", payload.c_str());
+  
+  int httpCode = http.POST(payload);
+  
+  if (httpCode > 0) {
+    String response = http.getString();
+    Serial.printf("Backend respuesta [%d]: %s\n", httpCode, response.c_str());
+    JsonDocument responseDoc;
+    DeserializationError error = deserializeJson(responseDoc, response);
+    
+    if (!error) {
+      bool authorized = responseDoc["authorized"] | false;
+      String personName = responseDoc["personName"] | "Desconocido";
+      
+      lcd.clear();
+      if (authorized) {
+        lcd.setCursor(0, 0);
+        lcd.print("HUELLA OK");
+        lcd.setCursor(0, 1);
+        lcd.print(personName.substring(0, 16));
+        
+        // === SOLO LA HUELLA ABRE LA PUERTA ===
+        abrirPuerta();
+        
+      } else {
+        lcd.setCursor(0, 0);
+        lcd.print("HUELLA DENEGADA");
+        lcd.setCursor(0, 1);
+        lcd.print(personName.substring(0, 16));
+        delay(3000);
+      }
+    }
+  } else {
+    Serial.printf("Error HTTP: %s\n", http.errorToString(httpCode).c_str());
+  }
+  
+  http.end();
+  
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Sistema listo");
 }
 
 // ============================================
