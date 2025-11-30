@@ -18,6 +18,7 @@ public class AccessLogResponseDTO {
     private String personName;
     private String cargo;
     private String accessType;
+    private String authenticationMethod;
     private Boolean authorized;
     private LocalDateTime accessTime;
     private String location;
