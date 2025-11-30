@@ -35,7 +35,11 @@ const char* WIFI_PASSWORD = "************";
 #define RST_PIN 27
 
 // SERVOMOTOR (PUERTA)
-#define PIN_SERVO 13  // Usamos el GPIO 13. ¡No uses el 9 en ESP32!
+#define PIN_SERVO 13 
+
+// LEDs INDICADORES
+#define PIN_LED_ROJO  32
+#define PIN_LED_VERDE 33 
 
 // ============================================
 // INICIALIZACIÓN DE DISPOSITIVOS
@@ -106,6 +110,12 @@ void abrirPuerta() {
 void setup() {
   Serial.begin(115200);
   Serial.println("\n\n=== ESP32 Access Control Server + Servo ===");
+
+  // ===== INICIALIZAR LEDs =====
+  pinMode(PIN_LED_ROJO, OUTPUT);
+  pinMode(PIN_LED_VERDE, OUTPUT);
+  digitalWrite(PIN_LED_ROJO, LOW);
+  digitalWrite(PIN_LED_VERDE, LOW);
   
   // ===== INICIALIZAR SERVO =====
   // ESP32Servo necesita configuración de timers a veces, pero attach suele bastar
@@ -343,18 +353,31 @@ void handleFingerprintVerify() {
     // === ACCION DEL SERVO ===
     abrirPuerta(); 
     
-  } else {
-    // === NO COINCIDE ===
-    doc["found"] = false;
-    doc["message"] = "Did not find a match";
+  } else if (p == FINGERPRINT_NOTFOUND) {
+    // Huella NO encontrada en la base de datos
+    Serial.println("Huella NO registrada - Acceso DENEGADO");
+    sendFingerprintAccessToBackend(0, 0);
+    
+    // Encender LED rojo
+    digitalWrite(PIN_LED_ROJO, HIGH);
+    digitalWrite(PIN_LED_VERDE, LOW);
+    
+    // Mostrar en LCD
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("No encontrado");
-    delay(1000);
+    lcd.print("ACCESO DENEGADO");
+    lcd.setCursor(0, 1);
+    lcd.print("Huella invalida");
     
-    String response;
-    serializeJson(doc, response);
-    server.send(200, "application/json", response);
+    delay(3000);
+    
+    // Apagar LED rojo
+    digitalWrite(PIN_LED_ROJO, LOW);
+    
+    // Restaurar LCD
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Sistema listo");
   }
   
   lcd.clear();
@@ -664,6 +687,32 @@ void checkFingerprintAuto() {
                   finger.fingerID, finger.confidence);
     sendFingerprintAccessToBackend(finger.fingerID, finger.confidence);
   }
+  else if (p == FINGERPRINT_NOTFOUND) {
+    // Huella NO encontrada en la base de datos
+    Serial.println("Huella NO registrada - Acceso DENEGADO");
+    sendFingerprintAccessToBackend(0, 0);
+    
+    // Encender LED rojo
+    digitalWrite(PIN_LED_ROJO, HIGH);
+    digitalWrite(PIN_LED_VERDE, LOW);
+    
+    // Mostrar en LCD
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("ACCESO DENEGADO");
+    lcd.setCursor(0, 1);
+    lcd.print("Huella invalida");
+    
+    delay(3000);
+    
+    // Apagar LED rojo
+    digitalWrite(PIN_LED_ROJO, LOW);
+    
+    // Restaurar LCD
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Sistema listo");
+  }
 }
 
 // ============================================
@@ -699,25 +748,42 @@ void sendFingerprintAccessToBackend(uint8_t fingerprintId, uint16_t confidence) 
       String personName = responseDoc["personName"] | "Desconocido";
       
       lcd.clear();
-      if (authorized) {
+      if (authorized) { 
+        digitalWrite(PIN_LED_VERDE, HIGH);
+        digitalWrite(PIN_LED_ROJO, LOW);
+         
         lcd.setCursor(0, 0);
-        lcd.print("HUELLA OK");
+        lcd.print("ACCESO OK");
         lcd.setCursor(0, 1);
         lcd.print(personName.substring(0, 16));
-        
-        // === SOLO LA HUELLA ABRE LA PUERTA ===
+         
         abrirPuerta();
-        
+         
+        digitalWrite(PIN_LED_VERDE, LOW);
       } else {
+        digitalWrite(PIN_LED_ROJO, HIGH);
+        digitalWrite(PIN_LED_VERDE, LOW);
+         
         lcd.setCursor(0, 0);
-        lcd.print("HUELLA DENEGADA");
+        lcd.print("ACCESO DENEGADO");
         lcd.setCursor(0, 1);
         lcd.print(personName.substring(0, 16));
+        
         delay(3000);
+         
+        digitalWrite(PIN_LED_ROJO, LOW);
       }
     }
   } else {
     Serial.printf("Error HTTP: %s\n", http.errorToString(httpCode).c_str());
+
+    // Error de comunicación - parpadear LED rojo
+    digitalWrite(PIN_LED_ROJO, HIGH);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Error Backend");
+    delay(2000);
+    digitalWrite(PIN_LED_ROJO, LOW);
   }
   
   http.end();
