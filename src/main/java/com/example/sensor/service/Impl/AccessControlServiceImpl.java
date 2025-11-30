@@ -6,6 +6,7 @@ import com.example.sensor.mapper.RfidCardMapper;
 import com.example.sensor.model.dto.*;
 import com.example.sensor.model.entity.*;
 import com.example.sensor.model.enums.AccessType;
+import com.example.sensor.model.enums.AuthenticationMethod;
 import com.example.sensor.repository.*;
 import com.example.sensor.service.AccessControlService;
 import lombok.RequiredArgsConstructor;
@@ -127,10 +128,24 @@ public class AccessControlServiceImpl implements AccessControlService {
                         // Si no hay acceso previo, se mantiene ENTRADA (default)
                 }
 
+                // Determinar método de autenticación (RFID por defecto para
+                // retrocompatibilidad)
+                AuthenticationMethod authMethod = AuthenticationMethod.RFID;
+                if (requestDTO.getAuthenticationMethod() != null) {
+                        try {
+                                authMethod = AuthenticationMethod
+                                                .valueOf(requestDTO.getAuthenticationMethod().toUpperCase());
+                        } catch (IllegalArgumentException e) {
+                                log.warn("Método de autenticación inválido: {}, usando RFID",
+                                                requestDTO.getAuthenticationMethod());
+                        }
+                }
+
                 // Crear log de acceso
                 AccessLog accessLog = AccessLog.builder()
                                 .rfidCard(card)
                                 .accessType(accessType)
+                                .authenticationMethod(authMethod)
                                 .authorized(authorized)
                                 .location(requestDTO.getLocation())
                                 .deviceId(requestDTO.getDeviceId())

@@ -2,6 +2,7 @@ package com.example.sensor.model.entity;
 
 import java.time.LocalDateTime;
 import com.example.sensor.model.enums.AccessType;
+import com.example.sensor.model.enums.AuthenticationMethod;
 
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -22,7 +23,7 @@ public class AccessLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "access_id_int")
-    private Integer id; 
+    private Integer id;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "access_type_enum", nullable = false)
@@ -40,6 +41,10 @@ public class AccessLog {
 
     @Column(name = "access_device_id_vac")
     private String deviceId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "authentication_method_vac", nullable = false)
+    private AuthenticationMethod authenticationMethod;
 
     @Column(name = "access_notes_vac")
     private String notes;

@@ -9,9 +9,10 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AccessRegisterRequestDTO {
-    private String cardUid;
+public class FingerprintAccessRequestDTO {
+    private Integer fingerprintId;
+    private Integer confidence;
     private String location;
     private String deviceId;
-    private String authenticationMethod; // "RFID" or "FINGERPRINT"
+    private String authenticationMethod; // "FINGERPRINT"
 }

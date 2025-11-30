@@ -4,6 +4,8 @@ import com.example.sensor.model.dto.EnrollProgressDTO;
 import com.example.sensor.model.dto.FingerPrintRequestDTO;
 import com.example.sensor.model.dto.FingerPrintResponseDTO;
 import com.example.sensor.model.dto.FingerPrintVerifyResponseDTO;
+import com.example.sensor.model.dto.FingerprintAccessRequestDTO;
+import com.example.sensor.model.dto.AccessRegisterResponseDTO;
 import com.example.sensor.service.FingerPrintService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,6 +63,14 @@ public class FingerPrintController {
         log.info("POST /fingerprints/verify - Verificando huella");
         FingerPrintVerifyResponseDTO result = fingerprintService.verifyFingerprint();
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/access")
+    public ResponseEntity<AccessRegisterResponseDTO> registerFingerprintAccess(
+            @RequestBody FingerprintAccessRequestDTO requestDTO) {
+        log.info("POST /fingerprints/access - Fingerprint ID: {}", requestDTO.getFingerprintId());
+        AccessRegisterResponseDTO response = fingerprintService.registerFingerprintAccess(requestDTO);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/count")

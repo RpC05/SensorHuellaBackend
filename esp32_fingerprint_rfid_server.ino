@@ -1,30 +1,6 @@
 /**
  * ESP32 Unified Access Control - HTTP REST API Server
- * 
- * Sistema integrado que maneja:
- * - Sensor de huellas AS608
- * - Lector RFID MFRC522
- * - Display LCD I2C 16x2
- * 
- * Hardware:
- * - ESP32 DevKit v1
- * - Sensor AS608 (Serial2: GPIO 16=RX, GPIO 17=TX)
- * - MFRC522 RFID (SPI: GPIO 5=SS, GPIO 27=RST)
- * - LCD I2C 16x2 (dirección 0x27)
- * 
- * Endpoints Fingerprint:
- * - GET  /api/fingerprint/ping
- * - GET  /api/fingerprint/count
- * - POST /api/fingerprint/enroll
- * - POST /api/fingerprint/verify
- * - DELETE /api/fingerprint/{id}
- * - DELETE /api/fingerprint/empty
- * 
- * Endpoints RFID:
- * - GET  /api/rfid/ping
- * - POST /api/rfid/scan
- * 
- * @version 3.0 (Unified Version)
+ * CON INTEGRACIÓN DE SERVOMOTOR PARA PUERTA
  */
 
 #include <WiFi.h>
@@ -37,18 +13,19 @@
 #include <MFRC522.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include <ESP32Servo.h> // <--- LIBRERÍA NECESARIA PARA ESP32
 
 // ============================================
 // CONFIGURACIÓN BACKEND
 // ============================================
-const char* BACKEND_URL = "https://nombre.onrender.com";
+const char* BACKEND_URL = "http://ipLocal:8080"; // para pruebas ip local, para produccion, url directamente
 const char* ACCESS_ENDPOINT = "/api/v1/access/register";
 
 // ============================================
 // CONFIGURACIÓN WiFi
 // ============================================
-const char* WIFI_SSID = "***********";
-const char* WIFI_PASSWORD = "**************";
+const char* WIFI_SSID = "**********";
+const char* WIFI_PASSWORD = "************";
 
 // ============================================
 // CONFIGURACIÓN PINES
@@ -57,6 +34,9 @@ const char* WIFI_PASSWORD = "**************";
 #define SS_PIN  5
 #define RST_PIN 27
 
+// SERVOMOTOR (PUERTA)
+#define PIN_SERVO 13  // Usamos el GPIO 13. ¡No uses el 9 en ESP32!
+
 // ============================================
 // INICIALIZACIÓN DE DISPOSITIVOS
 // ============================================
@@ -64,6 +44,20 @@ WebServer server(80);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&Serial2);
 MFRC522 rfid(SS_PIN, RST_PIN);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
+Servo puertaServo; // Objeto del Servo
+
+// ============================================
+// VARIABLES SERVO
+// ============================================
+const int ANGULO_CERRADO = 0;
+const int ANGULO_ABIERTO = 90;
+const int TIEMPO_PUERTA = 4000; // 4 segundos
+
+// ============================================
+// VARIABLES PARA VERIFICACIÓN AUTOMÁTICA DE HUELLA
+// ============================================
+unsigned long lastFingerprintCheck = 0;
+const unsigned long FINGERPRINT_CHECK_INTERVAL = 2000; // Escanear cada 2 segundos
 
 // ============================================
 // ESTRUCTURAS DE DATOS
@@ -92,12 +86,33 @@ EnrollState enrollState;
 unsigned long lastCardTime = 0;
 
 // ============================================
+// FUNCION AUXILIAR: ABRIR PUERTA
+// ============================================
+void abrirPuerta() {
+  Serial.println(">> ABRINEDO PUERTA...");
+  puertaServo.write(ANGULO_ABIERTO); // Abrir
+  
+  // Como estamos en un servidor web, usar delay() largo puede bloquear peticiones,
+  // pero para una maqueta es aceptable.
+  delay(TIEMPO_PUERTA); 
+  
+  puertaServo.write(ANGULO_CERRADO); // Cerrar
+  Serial.println(">> PUERTA CERRADA");
+}
+
+// ============================================
 // SETUP
 // ============================================
 void setup() {
   Serial.begin(115200);
-  Serial.println("\n\n=== ESP32 Unified Access Control Server ===");
+  Serial.println("\n\n=== ESP32 Access Control Server + Servo ===");
   
+  // ===== INICIALIZAR SERVO =====
+  // ESP32Servo necesita configuración de timers a veces, pero attach suele bastar
+  puertaServo.setPeriodHertz(50); // Standard 50hz servo
+  puertaServo.attach(PIN_SERVO, 500, 2400); 
+  puertaServo.write(ANGULO_CERRADO); // Asegurar puerta cerrada al inicio
+
   // ===== INICIALIZAR LCD =====
   lcd.init();
   lcd.backlight();
@@ -193,9 +208,8 @@ void setup() {
 // ============================================
 void loop() {
   server.handleClient();
-  
-  // Auto-detección de tarjeta RFID (opcional, para mostrar en LCD)
-  checkRfidCard();
+  checkRfidCard(); // Auto-detección de tarjeta RFID
+  checkFingerprintAuto(); // Auto-detección de huella digital
 }
 
 // ============================================
@@ -204,11 +218,9 @@ void loop() {
 
 void handleFingerprintPing() {
   Serial.println("GET /api/fingerprint/ping");
-  
   JsonDocument doc;
   doc["status"] = "ok";
   doc["device"] = "fingerprint";
-  
   String response;
   serializeJson(doc, response);
   server.send(200, "application/json", response);
@@ -216,12 +228,9 @@ void handleFingerprintPing() {
 
 void handleFingerprintCount() {
   Serial.println("GET /api/fingerprint/count");
-  
   finger.getTemplateCount();
-  
   JsonDocument doc;
   doc["count"] = finger.templateCount;
-  
   String response;
   serializeJson(doc, response);
   server.send(200, "application/json", response);
@@ -229,27 +238,20 @@ void handleFingerprintCount() {
 
 void handleFingerprintEnroll() {
   Serial.println("POST /api/fingerprint/enroll");
-  
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Enrollando...");
-  
   enrollState.reset();
   enrollState.inProgress = true;
-  
   bool success = performEnroll();
-  
   JsonDocument doc;
-  
   if (success) {
     doc["status"] = "success";
     doc["id"] = enrollState.enrolledId;
-    
     JsonArray messagesArray = doc["messages"].to<JsonArray>();
     for (int i = 0; i < enrollState.messagesCount; i++) {
       messagesArray.add(enrollState.messages[i].as<const char*>());
     }
-    
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Huella OK");
@@ -260,24 +262,19 @@ void handleFingerprintEnroll() {
   } else {
     doc["status"] = "error";
     doc["error"] = "Enroll failed";
-    
     JsonArray messagesArray = doc["messages"].to<JsonArray>();
     for (int i = 0; i < enrollState.messagesCount; i++) {
       messagesArray.add(enrollState.messages[i].as<const char*>());
     }
-    
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Error enroll");
     delay(2000);
   }
-  
   String response;
   serializeJson(doc, response);
-  
   server.send(success ? 200 : 400, "application/json", response);
   enrollState.reset();
-  
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Sistema listo");
@@ -296,11 +293,9 @@ void handleFingerprintVerify() {
   if (p != FINGERPRINT_OK) {
     doc["found"] = false;
     doc["message"] = "No finger detected";
-    
     String response;
     serializeJson(doc, response);
     server.send(200, "application/json", response);
-    
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("No detectado");
@@ -312,11 +307,9 @@ void handleFingerprintVerify() {
   if (p != FINGERPRINT_OK) {
     doc["found"] = false;
     doc["message"] = "Image too messy";
-    
     String response;
     serializeJson(doc, response);
     server.send(200, "application/json", response);
-    
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Imagen mala");
@@ -326,6 +319,7 @@ void handleFingerprintVerify() {
   
   p = finger.fingerFastSearch();
   if (p == FINGERPRINT_OK) {
+    // === HUELLA ENCONTRADA ===
     doc["found"] = true;
     doc["id"] = finger.fingerID;
     doc["confidence"] = finger.confidence;
@@ -336,25 +330,32 @@ void handleFingerprintVerify() {
     
     lcd.clear();
     lcd.setCursor(0, 0);
+    lcd.print("ACCESO OK");
+    lcd.setCursor(0, 1);
     lcd.print("ID: ");
     lcd.print(finger.fingerID);
-    lcd.setCursor(0, 1);
-    lcd.print("Conf: ");
-    lcd.print(finger.confidence);
-    delay(2000);
+    
+    // Enviamos la respuesta PRIMERO para no bloquear el cliente HTTP
+    String response;
+    serializeJson(doc, response);
+    server.send(200, "application/json", response);
+
+    // === ACCION DEL SERVO ===
+    abrirPuerta(); 
+    
   } else {
+    // === NO COINCIDE ===
     doc["found"] = false;
     doc["message"] = "Did not find a match";
-    
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("No encontrado");
     delay(1000);
+    
+    String response;
+    serializeJson(doc, response);
+    server.send(200, "application/json", response);
   }
-  
-  String response;
-  serializeJson(doc, response);
-  server.send(200, "application/json", response);
   
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -364,11 +365,8 @@ void handleFingerprintVerify() {
 void handleDeleteFingerprint() {
   String idParam = server.pathArg(0);
   uint8_t id = idParam.toInt();
-  
   Serial.printf("DELETE /api/fingerprint/%d\n", id);
-  
   uint8_t p = finger.deleteModel(id);
-  
   if (p == FINGERPRINT_OK) {
     server.send(200, "application/json", "{\"status\":\"deleted\"}");
   } else {
@@ -378,9 +376,7 @@ void handleDeleteFingerprint() {
 
 void handleFingerprintEmpty() {
   Serial.println("DELETE /api/fingerprint/empty");
-  
   uint8_t p = finger.emptyDatabase();
-  
   if (p == FINGERPRINT_OK) {
     server.send(200, "application/json", "{\"status\":\"emptied\"}");
   } else {
@@ -394,11 +390,9 @@ void handleFingerprintEmpty() {
 
 void handleRfidPing() {
   Serial.println("GET /api/rfid/ping");
-  
   JsonDocument doc;
   doc["status"] = "ok";
   doc["device"] = "rfid";
-  
   String response;
   serializeJson(doc, response);
   server.send(200, "application/json", response);
@@ -406,47 +400,36 @@ void handleRfidPing() {
 
 void handleRfidScan() {
   Serial.println("POST /api/rfid/scan");
-  
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Escanea tarjeta");
-  
   JsonDocument doc;
-  
-  // Esperar tarjeta (timeout 5 segundos)
   unsigned long startTime = millis();
   bool cardDetected = false;
-  
   while (millis() - startTime < 5000 && !cardDetected) {
     server.handleClient();
-    
     if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
       cardDetected = true;
       break;
     }
     delay(50);
   }
-  
   if (!cardDetected) {
     doc["success"] = false;
     doc["message"] = "No card detected";
-    
     String response;
     serializeJson(doc, response);
     server.send(200, "application/json", response);
-    
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Sin tarjeta");
     delay(1000);
-    
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Sistema listo");
     return;
   }
   
-  // Obtener UID
   String uid = "";
   for (byte i = 0; i < rfid.uid.size; i++) {
     if (i > 0) uid += ":";
@@ -457,55 +440,44 @@ void handleRfidScan() {
   
   doc["success"] = true;
   doc["uid"] = uid;
-  
   String response;
   serializeJson(doc, response);
   server.send(200, "application/json", response);
-  
   Serial.printf("Tarjeta detectada: %s\n", uid.c_str());
-  
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("UID:");
   lcd.setCursor(0, 1);
   lcd.print(uid.substring(0, 16));
   delay(2000);
-  
   rfid.PICC_HaltA();
   rfid.PCD_StopCrypto1();
-  
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Sistema listo");
 }
 
 // ============================================
-// FUNCIÓN AUXILIAR RFID
+// FUNCIÓN AUXILIAR RFID (Backend Access)
 // ============================================
 void sendAccessToBackend(String cardUid) {
   HTTPClient http;
-  
   String fullUrl = String(BACKEND_URL) + String(ACCESS_ENDPOINT);
-  
   http.begin(fullUrl);
   http.addHeader("Content-Type", "application/json");
-  
   JsonDocument doc;
   doc["cardUid"] = cardUid;
   doc["location"] = "Puerta Principal";
   doc["deviceId"] = "ESP32-001";
-  
+  doc["authenticationMethod"] = "RFID";
   String payload;
   serializeJson(doc, payload);
-  
   Serial.printf("Enviando al backend: %s\n", payload.c_str());
-  
   int httpCode = http.POST(payload);
   
   if (httpCode > 0) {
     String response = http.getString();
     Serial.printf("Backend respuesta [%d]: %s\n", httpCode, response.c_str());
-    
     JsonDocument responseDoc;
     DeserializationError error = deserializeJson(responseDoc, response);
     
@@ -519,13 +491,18 @@ void sendAccessToBackend(String cardUid) {
         lcd.print("ACCESO OK");
         lcd.setCursor(0, 1);
         lcd.print(personName.substring(0, 16));
+        
+        // === NOTA: RFID YA NO ABRE LA PUERTA ===
+        // Solo la huella digital puede abrir la puerta
+        // La tarjeta RFID solo registra el acceso
+        // abrirPuerta(); 
       } else {
         lcd.setCursor(0, 0);
         lcd.print("ACCESO DENEGADO");
         lcd.setCursor(0, 1);
         lcd.print(personName.substring(0, 16));
+        delay(3000); // Solo delay para mensaje
       }
-      delay(3000);
     }
   } else {
     Serial.printf("Error HTTP: %s\n", http.errorToString(httpCode).c_str());
@@ -534,26 +511,19 @@ void sendAccessToBackend(String cardUid) {
     lcd.print("Error Backend");
     delay(2000);
   }
-  
   http.end();
 }
 
 void checkRfidCard() {
   unsigned long currentTime = millis();
-  
-  // Reinicializar RFID cada 5 segundos si no hay actividad
   if (currentTime - lastCardTime > 5000) {
     rfid.PCD_Init();
     lastCardTime = currentTime;
   }
-  
-  // Verificar si hay tarjeta (sin bloquear)
   if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial())
     return;
   
   lastCardTime = currentTime;
-  
-  // Obtener UID para mostrar en LCD
   String uid = "";
   for (byte i = 0; i < rfid.uid.size; i++) {
     if (i > 0) uid += ":";
@@ -561,22 +531,18 @@ void checkRfidCard() {
     uid += String(rfid.uid.uidByte[i], HEX);
   }
   uid.toUpperCase();
-  
   Serial.printf("Tarjeta detectada: %s\n", uid.c_str());
-  
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("RFID:");
   lcd.setCursor(0, 1);
   lcd.print(uid.substring(0, 16));
-  
   delay(500);
-
+  
   sendAccessToBackend(uid);
   
   rfid.PICC_HaltA();
   rfid.PCD_StopCrypto1();
-  
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Sistema listo");
@@ -588,10 +554,8 @@ void checkRfidCard() {
 
 bool performEnroll() {
   enrollState.addMessage("Waiting for valid finger to enroll");
-  
   lcd.setCursor(0, 1);
   lcd.print("Coloca dedo 1");
-  
   int p = -1;
   while (p != FINGERPRINT_OK) {
     server.handleClient();
@@ -607,30 +571,25 @@ bool performEnroll() {
       return false;
     }
   }
-  
   p = finger.image2Tz(1);
   if (p != FINGERPRINT_OK) {
     enrollState.addMessage("Image too messy");
     return false;
   }
   enrollState.addMessage("Image converted");
-  
   lcd.setCursor(0, 1);
   lcd.print("Remueve dedo  ");
   enrollState.addMessage("Remove finger");
   delay(2000);
-  
   p = 0;
   while (p != FINGERPRINT_NOFINGER) {
     server.handleClient();
     p = finger.getImage();
     delay(50);
   }
-  
   lcd.setCursor(0, 1);
   lcd.print("Coloca dedo 2");
   enrollState.addMessage("Place same finger again");
-  
   p = -1;
   while (p != FINGERPRINT_OK) {
     server.handleClient();
@@ -646,16 +605,13 @@ bool performEnroll() {
       return false;
     }
   }
-  
   p = finger.image2Tz(2);
   if (p != FINGERPRINT_OK) {
     enrollState.addMessage("Image too messy");
     return false;
   }
   enrollState.addMessage("Image converted");
-  
   enrollState.addMessage("Creating model");
-  
   p = finger.createModel();
   if (p == FINGERPRINT_OK) {
     enrollState.addMessage("Prints matched!");
@@ -666,14 +622,11 @@ bool performEnroll() {
     enrollState.addMessage("Unknown error");
     return false;
   }
-  
   finger.getTemplateCount();
   uint8_t id = finger.templateCount + 1;
-  
   char idMsg[20];
   sprintf(idMsg, "ID %d", id);
   enrollState.addMessage(idMsg);
-  
   p = finger.storeModel(id);
   if (p == FINGERPRINT_OK) {
     enrollState.addMessage("Stored!");
@@ -686,18 +639,104 @@ bool performEnroll() {
 }
 
 // ============================================
+// FUNCIÓN: VERIFICACIÓN AUTOMÁTICA DE HUELLA
+// ============================================
+void checkFingerprintAuto() {
+  unsigned long currentTime = millis();
+  
+  // Escanear cada 2 segundos para no saturar
+  if (currentTime - lastFingerprintCheck < FINGERPRINT_CHECK_INTERVAL) {
+    return;
+  }
+  
+  lastFingerprintCheck = currentTime;
+  
+  uint8_t p = finger.getImage();
+  if (p != FINGERPRINT_OK) return; // No hay dedo
+  
+  p = finger.image2Tz();
+  if (p != FINGERPRINT_OK) return; // Imagen mala
+  
+  p = finger.fingerFastSearch();
+  if (p == FINGERPRINT_OK) {
+    // Huella encontrada - enviar al backend
+    Serial.printf("Huella detectada automáticamente: ID #%d, Confidence: %d\n", 
+                  finger.fingerID, finger.confidence);
+    sendFingerprintAccessToBackend(finger.fingerID, finger.confidence);
+  }
+}
+
+// ============================================
+// FUNCIÓN: ENVIAR ACCESO DE HUELLA AL BACKEND
+// ============================================
+void sendFingerprintAccessToBackend(uint8_t fingerprintId, uint16_t confidence) {
+  HTTPClient http;
+  String fullUrl = String(BACKEND_URL) + "/api/v1/fingerprints/access";
+  http.begin(fullUrl);
+  http.addHeader("Content-Type", "application/json");
+  
+  JsonDocument doc;
+  doc["fingerprintId"] = fingerprintId;
+  doc["confidence"] = confidence;
+  doc["location"] = "Puerta Principal";
+  doc["deviceId"] = "ESP32-001";
+  doc["authenticationMethod"] = "FINGERPRINT";
+  
+  String payload;
+  serializeJson(doc, payload);
+  Serial.printf("Enviando huella al backend: %s\n", payload.c_str());
+  
+  int httpCode = http.POST(payload);
+  
+  if (httpCode > 0) {
+    String response = http.getString();
+    Serial.printf("Backend respuesta [%d]: %s\n", httpCode, response.c_str());
+    JsonDocument responseDoc;
+    DeserializationError error = deserializeJson(responseDoc, response);
+    
+    if (!error) {
+      bool authorized = responseDoc["authorized"] | false;
+      String personName = responseDoc["personName"] | "Desconocido";
+      
+      lcd.clear();
+      if (authorized) {
+        lcd.setCursor(0, 0);
+        lcd.print("HUELLA OK");
+        lcd.setCursor(0, 1);
+        lcd.print(personName.substring(0, 16));
+        
+        // === SOLO LA HUELLA ABRE LA PUERTA ===
+        abrirPuerta();
+        
+      } else {
+        lcd.setCursor(0, 0);
+        lcd.print("HUELLA DENEGADA");
+        lcd.setCursor(0, 1);
+        lcd.print(personName.substring(0, 16));
+        delay(3000);
+      }
+    }
+  } else {
+    Serial.printf("Error HTTP: %s\n", http.errorToString(httpCode).c_str());
+  }
+  
+  http.end();
+  
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Sistema listo");
+}
+
+// ============================================
 // HANDLER 404
 // ============================================
 
 void handleNotFound() {
   Serial.printf("404: %s\n", server.uri().c_str());
-  
   JsonDocument doc;
   doc["error"] = "Not Found";
   doc["path"] = server.uri();
-  
   String response;
   serializeJson(doc, response);
-  
   server.send(404, "application/json", response);
 }
