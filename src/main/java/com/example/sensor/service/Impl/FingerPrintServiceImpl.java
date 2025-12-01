@@ -294,27 +294,23 @@ public class FingerPrintServiceImpl implements FingerPrintService {
             AccessType accessType = AccessType.ENTRADA;
 
             if (fingerprint != null) {
-                // Buscar el último acceso de esta huella
-                // Nota: No hay relación directa entre AccessLog y FingerPrint aún
-                // Por ahora asumiremos ENTRADA/SALIDA alternados
-                // TODO: Agregar relación AccessLog -> FingerPrint para mejorar esto
-                List<AccessLog> recentLogs = accessLogRepository
-                        .findByAccessTimeBetween(LocalDateTime.now().minusMinutes(5), LocalDateTime.now());
+                // Buscar el último acceso de ESTA huella específica
+                Optional<AccessLog> lastAccess = accessLogRepository
+                        .findLastAccessByFingerprint(fingerprint.getFingerprintId());
 
-                Optional<AccessLog> lastFingerprintAccess = recentLogs.stream()
-                        .filter(log -> log.getAuthenticationMethod() == AuthenticationMethod.FINGERPRINT)
-                        .findFirst();
-
-                if (lastFingerprintAccess.isPresent()) {
-                    accessType = lastFingerprintAccess.get().getAccessType() == AccessType.ENTRADA
+                if (lastAccess.isPresent()) {
+                    // Alternar: Si el último fue ENTRADA, ahora es SALIDA y viceversa
+                    accessType = lastAccess.get().getAccessType() == AccessType.ENTRADA
                             ? AccessType.SALIDA
                             : AccessType.ENTRADA;
                 }
+                // Si no hay acceso previo, se mantiene ENTRADA (default)
             }
 
             // Crear log de acceso
             AccessLog accessLog = AccessLog.builder()
                     .rfidCard(null) // No hay tarjeta RFID asociada
+                    .fingerPrint(fingerprint) // Asociar la huella al registro
                     .accessType(accessType)
                     .authenticationMethod(AuthenticationMethod.FINGERPRINT)
                     .authorized(authorized)

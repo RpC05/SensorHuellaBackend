@@ -16,6 +16,9 @@ public interface AccessLogRepository extends JpaRepository<AccessLog, Integer> {
     @Query("SELECT a FROM AccessLog a WHERE a.rfidCard.id = :cardId ORDER BY a.accessTime DESC LIMIT 1")
     Optional<AccessLog> findLastAccessByCard(@Param("cardId") Integer cardId);
 
+    @Query("SELECT a FROM AccessLog a WHERE a.fingerPrint.fingerprintId = :fingerprintId ORDER BY a.accessTime DESC LIMIT 1")
+    Optional<AccessLog> findLastAccessByFingerprint(@Param("fingerprintId") Integer fingerprintId);
+
     @Query("SELECT COUNT(a) FROM AccessLog a WHERE a.authorized = true")
     Long countAuthorizedAccesses();
 

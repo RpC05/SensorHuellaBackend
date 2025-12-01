@@ -52,4 +52,8 @@ public class AccessLog {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rfid_id_int")
     private RfidCard rfidCard;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fprint_id_int")
+    private FingerPrint fingerPrint;
 }

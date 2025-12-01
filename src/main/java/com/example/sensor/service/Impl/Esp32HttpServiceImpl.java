@@ -6,6 +6,8 @@ import com.example.sensor.model.dto.Esp32CountResponseDTO;
 import com.example.sensor.model.dto.Esp32EnrollResponseDTO;
 import com.example.sensor.model.dto.Esp32VerifyResponseDTO;
 import com.example.sensor.service.SerialService;
+
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -25,7 +27,7 @@ import java.util.List;
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
+@RequiredArgsConstructor 
 public class Esp32HttpServiceImpl implements SerialService {
 
     private final WebClient esp32WebClient;
@@ -281,33 +283,10 @@ public class Esp32HttpServiceImpl implements SerialService {
     /**
      * DTO interno para parsear respuesta del ESP32 RFID scan
      */
+    @Data
     private static class RfidScanResponse {
         private Boolean success;
         private String uid;
         private String message;
-
-        public Boolean getSuccess() {
-            return success;
-        }
-
-        public void setSuccess(Boolean success) {
-            this.success = success;
-        }
-
-        public String getUid() {
-            return uid;
-        }
-
-        public void setUid(String uid) {
-            this.uid = uid;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public void setMessage(String message) {
-            this.message = message;
-        }
     }
 }
