@@ -14,7 +14,15 @@ public class AccessLogMapper {
             return null;
 
         RfidCard card = log.getRfidCard();
-        User user = card != null ? card.getUser() : null;
+        
+        // Determinar el usuario según el método de autenticación
+        User user = null;
+        if (card != null) {
+            user = card.getUser();
+        } else if (log.getFingerPrint() != null) {
+            user = log.getFingerPrint().getUser();
+        }
+        
         String personName = user != null ? user.getNombres() + " " + user.getApellidoPaterno() : "Desconocido";
 
         return AccessLogResponseDTO.builder()
