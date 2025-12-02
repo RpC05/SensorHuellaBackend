@@ -43,7 +43,7 @@ public class RfidCard {
     @Column(name = "rfid_upd_dt")
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "rfidCard", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "rfidCard", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private List<AccessLog> accessLogs;
 
     @OneToOne

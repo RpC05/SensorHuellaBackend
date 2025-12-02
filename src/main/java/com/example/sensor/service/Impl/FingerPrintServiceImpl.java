@@ -160,6 +160,15 @@ public class FingerPrintServiceImpl implements FingerPrintService {
 
             log.info("Eliminando huella ID:{}", fingerprint.getFingerprintId());
 
+            // Si la huella está asociada a un usuario, desactivar el usuario también (soft delete)
+            if (fingerprint.getUser() != null) {
+                User user = fingerprint.getUser();
+                log.warn("Huella ID {} está asociada al usuario {} '{}', desactivando usuario...", 
+                        id, user.getId(), user.getNombres() + " " + user.getApellidoPaterno());
+                user.setActive(false);
+                // No es necesario guardar explícitamente por la cascada
+            }
+
             try {
                 List<String> messages = serialService
                         .sendCommandWithProgress("DELETE " + fingerprint.getFingerprintId());
@@ -172,8 +181,10 @@ public class FingerPrintServiceImpl implements FingerPrintService {
                 log.warn("Error eliminando del sensor: {}", e.getMessage());
             }
 
-            repository.delete(fingerprint);
-            log.info("Huella eliminada de la BD");
+            // Marcar como inactiva en lugar de eliminar (para mantener historial)
+            fingerprint.setActive(false);
+            repository.save(fingerprint);
+            log.info("Huella desactivada en la BD");
 
         } catch (FingerPrintNotFoundException e) {
             throw e;

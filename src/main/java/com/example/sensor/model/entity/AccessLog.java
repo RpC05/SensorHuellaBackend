@@ -50,10 +50,10 @@ public class AccessLog {
     private String notes;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "rfid_id_int")
+    @JoinColumn(name = "rfid_id_int", nullable = true)
     private RfidCard rfidCard;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "fprint_id_int")
+    @JoinColumn(name = "fprint_id_int", nullable = true)
     private FingerPrint fingerPrint;
 }

@@ -73,6 +73,7 @@ public class AccessControlServiceImpl implements AccessControlService {
         @Transactional(readOnly = true)
         public List<RfidCardResponseDTO> getAllCards() {
                 return cardRepository.findAll().stream()
+                                .filter(RfidCard::getActive) // Solo mostrar tarjetas activas
                                 .map(rfidCardMapper::toResponseDTO)
                                 .collect(Collectors.toList());
         }
@@ -81,6 +82,15 @@ public class AccessControlServiceImpl implements AccessControlService {
         public void deleteCard(Integer id) {
                 RfidCard card = cardRepository.findById(id)
                                 .orElseThrow(() -> new FingerPrintNotFoundException(id));
+                
+                // Si la tarjeta está asociada a un usuario, desasociarla primero
+                if (card.getUser() != null) {
+                        log.info("Tarjeta ID {} está asociada al usuario {}, desasociando...", 
+                                id, card.getUser().getId());
+                        card.setUser(null);
+                        cardRepository.save(card);
+                }
+                
                 cardRepository.delete(card);
                 log.info("Tarjeta ID {} eliminada físicamente", id);
         }

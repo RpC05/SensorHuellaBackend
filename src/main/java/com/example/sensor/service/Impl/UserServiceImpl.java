@@ -61,6 +61,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public List<UserResponseDTO> getAllUsers() {
         return userRepository.findAll().stream()
+                .filter(User::getActive) // Solo mostrar usuarios activos
                 .map(userMapper::toResponseDTO)
                 .collect(Collectors.toList());
     }
@@ -82,26 +83,27 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new FingerPrintNotFoundException(id));
 
-        // Desasignar y eliminar huella del sensor físico
+        // Eliminar huella del sensor físico (pero mantener relación en BD para historial)
         if (user.getFingerPrint() != null) {
             FingerPrint fingerPrint = user.getFingerPrint();
             Integer fingerprintId = fingerPrint.getFingerprintId();
             
             try {
-                // Eliminar huella del sensor ESP32
+                // Eliminar huella del sensor ESP32 físico
                 log.info("Eliminando huella ID {} del sensor ESP32...", fingerprintId);
                 esp32HttpService.sendCommand("DELETE " + fingerprintId);
                 log.info("Huella eliminada del sensor físico");
             } catch (Exception e) {
                 log.error("Error eliminando huella del sensor: {}", e.getMessage());
-                // Continuar con la eliminación de la base de datos aunque falle el sensor
+                // Continuar aunque falle el sensor
             }
             
-            // Eliminar el registro de la huella en la base de datos
-            fingerPrintRepository.delete(fingerPrint);
+            // Marcar huella como inactiva pero NO eliminarla (para mantener historial)
+            fingerPrint.setActive(false);
+            fingerPrintRepository.save(fingerPrint);
         }
         
-        // Desasociar, deshabilitar y desautorizar tarjeta RFID (no la eliminamos, se puede reutilizar)
+        // Desasociar, deshabilitar y desautorizar tarjeta RFID
         if (user.getRfidCard() != null) {
             RfidCard card = user.getRfidCard();
             card.setUser(null);
@@ -111,9 +113,10 @@ public class UserServiceImpl implements UserService {
             log.info("Tarjeta RFID ID {} desasociada, deshabilitada y desautorizada", card.getId());
         }
 
-        // Eliminar físicamente el usuario
-        userRepository.delete(user);
-        log.info("Usuario eliminado físicamente: ID {}", id);
+        // Soft delete: solo marcar usuario como inactivo (mantener en BD para historial)
+        user.setActive(false);
+        userRepository.save(user);
+        log.info("Usuario desactivado (soft delete): ID {}", id);
     }
 
     @Override
