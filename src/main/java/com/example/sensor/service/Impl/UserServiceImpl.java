@@ -32,6 +32,7 @@ public class UserServiceImpl implements UserService {
     private final RfidCardRepository rfidCardRepository;
     private final FingerPrintRepository fingerPrintRepository;
     private final UserMapper userMapper;
+    private final Esp32HttpServiceImpl esp32HttpService;
 
     @Override
     public UserResponseDTO createUser(UserRequestDTO requestDTO) {
@@ -81,17 +82,30 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new FingerPrintNotFoundException(id));
 
-        // Desasignar relaciones antes de eliminar
+        // Desasignar y eliminar huella del sensor físico
+        if (user.getFingerPrint() != null) {
+            FingerPrint fingerPrint = user.getFingerPrint();
+            Integer fingerprintId = fingerPrint.getFingerprintId();
+            
+            try {
+                // Eliminar huella del sensor ESP32
+                log.info("Eliminando huella ID {} del sensor ESP32...", fingerprintId);
+                esp32HttpService.sendCommand("DELETE " + fingerprintId);
+                log.info("Huella eliminada del sensor físico");
+            } catch (Exception e) {
+                log.error("Error eliminando huella del sensor: {}", e.getMessage());
+                // Continuar con la eliminación de la base de datos aunque falle el sensor
+            }
+            
+            // Eliminar el registro de la huella en la base de datos
+            fingerPrintRepository.delete(fingerPrint);
+        }
+        
+        // Desasignar tarjeta RFID (no la eliminamos, solo la desasignamos)
         if (user.getRfidCard() != null) {
             RfidCard card = user.getRfidCard();
             card.setUser(null);
             rfidCardRepository.save(card);
-        }
-        
-        if (user.getFingerPrint() != null) {
-            FingerPrint fingerPrint = user.getFingerPrint();
-            fingerPrint.setUser(null);
-            fingerPrintRepository.save(fingerPrint);
         }
 
         // Eliminar físicamente el usuario
