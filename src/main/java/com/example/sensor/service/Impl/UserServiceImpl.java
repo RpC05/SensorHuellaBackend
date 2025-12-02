@@ -81,9 +81,22 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new FingerPrintNotFoundException(id));
 
-        user.setActive(false);
-        userRepository.save(user);
-        log.info("Usuario desactivado: ID {}", id);
+        // Desasignar relaciones antes de eliminar
+        if (user.getRfidCard() != null) {
+            RfidCard card = user.getRfidCard();
+            card.setUser(null);
+            rfidCardRepository.save(card);
+        }
+        
+        if (user.getFingerPrint() != null) {
+            FingerPrint fingerPrint = user.getFingerPrint();
+            fingerPrint.setUser(null);
+            fingerPrintRepository.save(fingerPrint);
+        }
+
+        // Eliminar físicamente el usuario
+        userRepository.delete(user);
+        log.info("Usuario eliminado físicamente: ID {}", id);
     }
 
     @Override
