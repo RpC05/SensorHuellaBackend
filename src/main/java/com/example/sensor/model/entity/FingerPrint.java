@@ -9,6 +9,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "fingerprints")
@@ -32,6 +33,9 @@ public class FingerPrint {
     @UpdateTimestamp
     @Column(name = "fprint_upd_dt")
     private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "fingerPrint", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<AccessLog> accessLogs;
 
     @OneToOne
     @JoinColumn(name = "usr_id_int", nullable = true, unique = true)

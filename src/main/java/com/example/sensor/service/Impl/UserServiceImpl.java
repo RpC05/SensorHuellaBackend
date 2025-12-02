@@ -101,11 +101,14 @@ public class UserServiceImpl implements UserService {
             fingerPrintRepository.delete(fingerPrint);
         }
         
-        // Desasignar tarjeta RFID (no la eliminamos, solo la desasignamos)
+        // Desasociar, deshabilitar y desautorizar tarjeta RFID (no la eliminamos, se puede reutilizar)
         if (user.getRfidCard() != null) {
             RfidCard card = user.getRfidCard();
             card.setUser(null);
+            card.setActive(false);
+            card.setAuthorized(false);
             rfidCardRepository.save(card);
+            log.info("Tarjeta RFID ID {} desasociada, deshabilitada y desautorizada", card.getId());
         }
 
         // Eliminar físicamente el usuario
